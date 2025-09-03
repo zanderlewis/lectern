@@ -1,0 +1,13 @@
+# Cargo specific
+target/
+
+# Manual Tests
+test*/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE specific
+.idea/
+.vscode/

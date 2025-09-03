@@ -1,0 +1,26 @@
+{
+    "name": "benchmark/symfony-app",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "symfony/console": "^6.0",
+        "symfony/framework-bundle": "^6.0",
+        "symfony/yaml": "^6.0",
+        "symfony/validator": "^6.0",
+        "symfony/form": "^6.0",
+        "symfony/security-bundle": "^6.0",
+        "doctrine/orm": "^2.12",
+        "doctrine/doctrine-bundle": "^2.7",
+        "twig/twig": "^3.0"
+    },
+    "require-dev": {
+        "symfony/phpunit-bridge": "^6.0",
+        "phpstan/phpstan": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "minimum-stability": "stable"
+}
