@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
 
     // Execute the requested command
     match cli.command {
+        Some(command) => match command {
         Commands::Install(args) => {
             if args.dry_run {
                 print_info("🔍 Dry run mode - no changes will be made");
@@ -198,6 +199,12 @@ async fn main() -> Result<()> {
         Commands::Validate(args) => {
             validate_composer_json(working_dir, &args)?;
         }
+        }
+        None => {
+            // No command provided, show help
+            use clap::CommandFactory;
+            Cli::command().print_help()?;
+        }
     }
 
     Ok(())
@@ -216,12 +223,33 @@ fn init_project(working_dir: &std::path::Path, args: &InitArgs) -> Result<()> {
 
     let composer = ComposerJson {
         name: args.name.clone(),
+        description: None,
+        version: None,
+        package_type: None,
+        keywords: None,
+        homepage: None,
+        readme: None,
+        time: None,
+        license: None,
+        authors: None,
+        support: None,
         require: BTreeMap::new(),
         require_dev: BTreeMap::new(),
+        conflict: None,
+        replace: None,
+        provide: None,
+        suggest: None,
         autoload: None,
+        autoload_dev: None,
+        include_path: None,
+        target_dir: None,
         repositories: None,
+        config: None,
+        scripts: None,
+        extra: None,
         minimum_stability: args.stability.clone(),
         prefer_stable: Some(true),
+        bin: None,
     };
 
     // Interactive package requirements

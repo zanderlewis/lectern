@@ -1,4 +1,4 @@
-use crate::model::{ComposerJson, LockedPackage};
+use crate::model::{ComposerJson, LockedPackage, SourceInfo, DistInfo};
 use crate::resolver::packagist::{
     P2Version, fetch_packagist_versions_cached, is_platform_dependency,
 };
@@ -7,8 +7,9 @@ use crate::utils::{print_error, print_info, print_step, print_success, print_war
 use anyhow::{Context, Result, anyhow};
 use reqwest::Client;
 use semver::{Version, VersionReq};
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeSet, VecDeque, BTreeMap};
 use std::path::Path;
+use sha2::{Sha256, Digest};
 
 /// Main dependency resolution function
 pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
@@ -18,6 +19,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
     let mut locked_packages = Vec::new();
     let mut processed = BTreeSet::new();
     let mut queue = VecDeque::new();
+    let mut dev_package_names = BTreeSet::new();
 
     // Add all direct dependencies to the queue
     for (name, constraint) in &composer.require {
@@ -35,6 +37,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
             print_info(&format!("⏭️  Skipping platform dependency: {name}"));
             continue;
         }
+        dev_package_names.insert(name.clone());
         queue.push_back((name.clone(), constraint.clone(), true));
     }
 
@@ -51,12 +54,33 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
             let locked = LockedPackage {
                 name: path_pkg.0,
                 version: path_pkg.1.unwrap_or_else(|| "dev-main".to_string()),
-                dist_url: None,
-                dist_type: None,
-                dist_shasum: None,
-                source_url: Some(pkg_name.clone()),
-                source_reference: None,
-                source_path: Some(pkg_name.clone()),
+                source: Some(SourceInfo {
+                    source_type: "path".to_string(),
+                    url: pkg_name.clone(),
+                    reference: "HEAD".to_string(),
+                }),
+                dist: None,
+                require: None,
+                require_dev: None,
+                conflict: None,
+                replace: None,
+                provide: None,
+                suggest: None,
+                package_type: Some("library".to_string()),
+                extra: None,
+                autoload: None,
+                autoload_dev: None,
+                notification_url: None,
+                license: None,
+                authors: None,
+                description: None,
+                homepage: None,
+                keywords: None,
+                support: None,
+                funding: None,
+                time: None,
+                bin: None,
+                include_path: None,
             };
             locked_packages.push(locked);
             continue;
@@ -108,15 +132,57 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
         let locked = LockedPackage {
             name: pkg_name.clone(),
             version: best_version.version.clone(),
-            dist_url: best_version.dist.as_ref().and_then(|d| d.url.clone()),
-            dist_type: best_version.dist.as_ref().and_then(|d| d.dtype.clone()),
-            dist_shasum: best_version.dist.as_ref().and_then(|d| d.shasum.clone()),
-            source_url: best_version.source.as_ref().and_then(|s| s.url.clone()),
-            source_reference: best_version
-                .source
-                .as_ref()
-                .and_then(|s| s.reference.clone()),
-            source_path: None,
+            source: best_version.source.as_ref().map(|s| SourceInfo {
+                source_type: s.stype.clone().unwrap_or_else(|| "git".to_string()),
+                url: s.url.clone().unwrap_or_default(),
+                reference: s.reference.clone().unwrap_or_default(),
+            }),
+            dist: best_version.dist.as_ref().map(|d| DistInfo {
+                dist_type: d.dtype.clone().unwrap_or_else(|| "zip".to_string()),
+                url: d.url.clone().unwrap_or_default(),
+                reference: d.reference.clone().unwrap_or_default(),
+                shasum: d.shasum.clone().unwrap_or_default(),
+            }),
+            require: best_version.require.clone(),
+            require_dev: best_version.other.get("require-dev")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            conflict: best_version.other.get("conflict")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            replace: best_version.other.get("replace")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            provide: best_version.other.get("provide")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            suggest: best_version.other.get("suggest")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            package_type: best_version.other.get("type")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+                .or_else(|| Some("library".to_string())),
+            extra: best_version.extra.clone(),
+            autoload: best_version.other.get("autoload")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            autoload_dev: best_version.other.get("autoload-dev")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            notification_url: Some("https://packagist.org/downloads/".to_string()),
+            license: best_version.other.get("license")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            authors: best_version.other.get("authors")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            description: best_version.other.get("description")
+                .and_then(|v| v.as_str().map(|s| s.to_string())),
+            homepage: best_version.other.get("homepage")
+                .and_then(|v| v.as_str().map(|s| s.to_string())),
+            keywords: best_version.other.get("keywords")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            support: best_version.other.get("support")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            funding: best_version.other.get("funding")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            time: best_version.other.get("time")
+                .and_then(|v| v.as_str().map(|s| s.to_string())),
+            bin: best_version.other.get("bin")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            include_path: best_version.other.get("include-path")
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
         };
 
         // Add dependencies to the queue
@@ -127,6 +193,10 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
                     continue;
                 }
                 if !processed.contains(dep_name) {
+                    // Mark transitive dependencies of dev packages as dev too
+                    if is_dev {
+                        dev_package_names.insert(dep_name.clone());
+                    }
                     queue.push_back((dep_name.clone(), dep_constraint.clone(), is_dev));
                 }
             }
@@ -137,17 +207,61 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
 
     // Sort packages by name for consistent output
     locked_packages.sort_by(|a, b| a.name.cmp(&b.name));
+    
+    // Separate dev and regular packages
+    let (dev_packages, regular_packages): (Vec<_>, Vec<_>) = locked_packages
+        .into_iter()
+        .partition(|pkg| dev_package_names.contains(&pkg.name));
 
-    print_success(&format!("✅ Resolved {} packages", locked_packages.len()));
+    print_success(&format!("✅ Resolved {} packages", regular_packages.len() + dev_packages.len()));
 
+    // Generate content hash for the lock file
+    let content_hash = generate_content_hash_from_composer(composer);
+    
     Ok(crate::model::Lock {
-        packages: locked_packages,
-        packages_dev: Vec::new(),
+        _readme: vec![
+            "This file locks the dependencies of your project to a known state".to_string(),
+            "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies".to_string(),
+            "This file is @generated automatically".to_string(),
+        ],
+        content_hash,
+        packages: regular_packages,
+        packages_dev: dev_packages,
+        aliases: vec![],
+        minimum_stability: composer.minimum_stability.clone().unwrap_or_else(|| "stable".to_string()),
+        stability_flags: BTreeMap::new(),
+        prefer_stable: composer.prefer_stable.unwrap_or(false),
+        prefer_lowest: false,
+        platform: BTreeMap::new(),
+        platform_dev: BTreeMap::new(),
+        plugin_api_version: Some("2.6.0".to_string()),
     })
 }
 
+/// Generate content hash from composer.json content
+pub fn generate_content_hash(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    let result = hasher.finalize();
+    hex::encode(result)
+}
+
+/// Generate content hash from ComposerJson structure
+fn generate_content_hash_from_composer(composer: &ComposerJson) -> String {
+    let mut hasher = Sha256::new();
+    
+    // Create a normalized representation for hashing
+    let mut content = String::new();
+    content.push_str(&serde_json::to_string(&composer.require).unwrap_or_default());
+    content.push_str(&serde_json::to_string(&composer.require_dev).unwrap_or_default());
+    
+    hasher.update(content.as_bytes());
+    let result = hasher.finalize();
+    hex::encode(result)
+}
+
 /// Find the best version that satisfies the constraint
-fn find_best_version<'a>(
+pub fn find_best_version<'a>(
     versions: &'a [P2Version],
     constraint: &VersionReq,
 ) -> Result<&'a P2Version> {

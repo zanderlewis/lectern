@@ -20,15 +20,17 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
 
     let lock = read_lock(&lock_path)?;
 
-    if lock.packages.is_empty() {
+    let total_packages = lock.packages.len() + lock.packages_dev.len();
+    if total_packages == 0 {
         if !quiet {
             print_info("📦 No packages installed.");
         }
         return Ok(());
     }
 
-    // Collect package names for bulk fetching
-    let package_names: Vec<String> = lock.packages.iter().map(|p| p.name.clone()).collect();
+    // Collect package names for bulk fetching (both regular and dev)
+    let mut package_names: Vec<String> = lock.packages.iter().map(|p| p.name.clone()).collect();
+    package_names.extend(lock.packages_dev.iter().map(|p| p.name.clone()));
 
     // Fetch package info for all packages concurrently
     let package_infos = fetch_multiple_package_info(&package_names).await?;
@@ -37,7 +39,11 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
     let mut table_rows = Vec::new();
 
     for (package_name, package_info_opt) in package_infos {
-        if let Some(locked_pkg) = lock.packages.iter().find(|p| p.name == package_name) {
+        // Look in both regular and dev packages
+        let locked_pkg = lock.packages.iter().find(|p| p.name == package_name)
+            .or_else(|| lock.packages_dev.iter().find(|p| p.name == package_name));
+        
+        if let Some(locked_pkg) = locked_pkg {
             if let Some(package_info) = package_info_opt {
                 if let Some(versions) = &package_info.package.versions {
                     // Find the latest stable version
@@ -128,15 +134,17 @@ pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result
 
     let lock = read_lock(&lock_path)?;
 
-    if lock.packages.is_empty() {
+    let total_packages = lock.packages.len() + lock.packages_dev.len();
+    if total_packages == 0 {
         if !quiet {
             print_info("📦 No packages installed.");
         }
         return Ok(());
     }
 
-    // Collect package names for bulk fetching
-    let package_names: Vec<String> = lock.packages.iter().map(|p| p.name.clone()).collect();
+    // Collect package names for bulk fetching (both regular and dev)
+    let mut package_names: Vec<String> = lock.packages.iter().map(|p| p.name.clone()).collect();
+    package_names.extend(lock.packages_dev.iter().map(|p| p.name.clone()));
 
     // Fetch package info for all packages concurrently
     let package_infos = fetch_multiple_package_info(&package_names).await?;
@@ -144,7 +152,11 @@ pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result
     let mut table_rows = Vec::new();
 
     for (package_name, package_info_opt) in package_infos {
-        if let Some(locked_pkg) = lock.packages.iter().find(|p| p.name == package_name) {
+        // Check both regular and dev packages
+        let locked_pkg = lock.packages.iter().find(|p| p.name == package_name)
+            .or_else(|| lock.packages_dev.iter().find(|p| p.name == package_name));
+        
+        if let Some(locked_pkg) = locked_pkg {
             let mut license_info = "Unknown".to_string();
 
             if let Some(package_info) = package_info_opt {
@@ -199,28 +211,23 @@ pub async fn show_dependency_status(working_dir: &Path) -> Result<()> {
 
     let lock = read_lock(&lock_path)?;
 
-    if !lock.packages.is_empty() {
-        println!("\n📦 Installed Packages ({} total):", lock.packages.len());
+    let total_packages = lock.packages.len() + lock.packages_dev.len();
+
+    if total_packages > 0 {
+        println!("\n📦 Installed Packages ({} total):", total_packages);
         println!("{:<40} {:<15} Type", "Package", "Version");
         println!("{}", "-".repeat(70));
 
         for pkg in &lock.packages {
-            let pkg_type = if pkg.name.starts_with("symfony/") {
-                "symfony"
-            } else if pkg.name.starts_with("laravel/") {
-                "laravel"
-            } else if pkg.name.starts_with("phpunit/") {
-                "testing"
-            } else if pkg.name.starts_with("psr/") {
-                "psr"
-            } else {
-                "library"
-            };
-
-            println!("{:<40} {:<15} {}", pkg.name, pkg.version, pkg_type);
+            println!("{:<40} {:<15} (regular)", pkg.name, pkg.version);
         }
 
-        print_success(&format!("✅ {} packages installed", lock.packages.len()));
+        // Show dev packages
+        for pkg in &lock.packages_dev {
+            println!("{:<40} {:<15} (dev)", pkg.name, pkg.version);
+        }
+
+        print_success(&format!("✅ {} packages installed", total_packages));
     } else {
         print_info("📦 No packages installed.");
     }

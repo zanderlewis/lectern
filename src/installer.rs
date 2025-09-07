@@ -11,6 +11,7 @@ use tokio::fs;
 use tokio::sync::Semaphore;
 use tokio::task;
 use zip::ZipArchive;
+use sha2::Digest;
 
 use crate::model::LockedPackage;
 use crate::utils;
@@ -23,8 +24,23 @@ pub struct InstalledPackage {
     pub path: Utf8PathBuf,
 }
 
-const NETWORK_FACTOR: usize = 4;
-const CPU_FACTOR: usize = 1;
+const NETWORK_FACTOR: usize = 8;
+const CPU_FACTOR: usize = 4;
+
+fn get_package_cache_dir() -> PathBuf {
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join(".lectern_cache")
+        .join("packages")
+}
+
+fn get_cached_package_path(name: &str, version: &str, url: &str) -> PathBuf {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(format!("{}-{}-{}", name, version, url).as_bytes());
+    let hash = format!("{:x}", hasher.finalize());
+    
+    get_package_cache_dir().join(format!("{}.zip", hash))
+}
 
 pub async fn install_packages(
     pkgs: &[LockedPackage],
@@ -85,19 +101,24 @@ async fn install_single(
 
     fs::create_dir_all(&target).await?;
 
-    if let Some(src_path) = &p.source_path {
-        copy_local_path_async(src_path, &target, cpu_sem.clone()).await?;
-    } else if let Some(dist_url) = &p.dist_url {
-        download_and_unpack_async(dist_url, &target, client, net_sem.clone(), cpu_sem.clone())
+    // Prefer dist (zip) over source (git) for better performance
+    if let Some(dist_info) = &p.dist {
+        // Handle distribution packages with caching
+        download_and_unpack_cached(&dist_info.url, &target, client, net_sem.clone(), cpu_sem.clone(), &p.name, &p.version)
             .await?;
-    } else if let Some(source_url) = &p.source_url {
-        clone_git_async(
-            source_url,
-            p.source_reference.as_ref(),
-            &target,
-            net_sem.clone(),
-        )
-        .await?;
+    } else if let Some(source_info) = &p.source {
+        if source_info.source_type == "path" {
+            copy_local_path_async(&source_info.url, &target, cpu_sem.clone()).await?;
+        } else {
+            // Handle git sources
+            clone_git_async(
+                &source_info.url,
+                Some(&source_info.reference),
+                &target,
+                net_sem.clone(),
+            )
+            .await?;
+        }
     } else {
         utils::print_error(&format!("No source/dist for {}", p.name));
         return Err(anyhow::anyhow!("no source/dist for {}", p.name));
@@ -130,82 +151,48 @@ async fn copy_local_path_async(src: &str, target: &Path, cpu_sem: Arc<Semaphore>
     Ok(())
 }
 
-async fn download_and_unpack_async(
+async fn download_and_unpack_cached(
     url: &str,
     target: &Path,
     client: &reqwest::Client,
     net_sem: Arc<Semaphore>,
     cpu_sem: Arc<Semaphore>,
+    package_name: &str,
+    package_version: &str,
 ) -> Result<()> {
-    let net_guard = net_sem.acquire_owned().await?;
-    let mut tmp = NamedTempFile::new()?;
-    let tmp_path = tmp.path().to_path_buf();
-
-    let resp = client.get(url).send().await?.error_for_status()?;
-    let mut stream = resp.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        let b = chunk?;
-        tmp.write_all(&b)?;
+    let cache_path = get_cached_package_path(package_name, package_version, url);
+    
+    // Create cache directory if it doesn't exist
+    if let Some(parent) = cache_path.parent() {
+        fs::create_dir_all(parent).await?;
     }
-    tmp.flush()?;
-    drop(net_guard);
-
-    let cpu_sem2 = cpu_sem.clone();
+    
+    // Check if cached file exists
+    if !cache_path.exists() {
+        // Download to cache
+        let net_guard = net_sem.acquire_owned().await?;
+        let mut cache_file = fs::File::create(&cache_path).await?;
+        
+        let resp = client.get(url).send().await?.error_for_status()?;
+        let mut stream = resp.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let b = chunk?;
+            tokio::io::AsyncWriteExt::write_all(&mut cache_file, &b).await?;
+        }
+        tokio::io::AsyncWriteExt::flush(&mut cache_file).await?;
+        drop(net_guard);
+    }
+    
+    // Extract from cache
+    let cpu_guard = cpu_sem.acquire_owned().await?;
     let target = target.to_path_buf();
+    let cache_path_clone = cache_path.clone();
     task::spawn_blocking(move || -> Result<()> {
-        let _cpu = cpu_sem2
-            .try_acquire()
-            .ok()
-            .or_else(|| {
-                Some(
-                    tokio::runtime::Handle::current()
-                        .block_on(cpu_sem2.acquire())
-                        .unwrap(),
-                )
-            })
-            .unwrap();
-        let p = tmp_path.clone();
-        if let Some(ext) = p.extension().and_then(|s| s.to_str()) {
-            match ext {
-                "zip" => {
-                    let f = std::fs::File::open(&p)?;
-                    let mut z = ZipArchive::new(f)?;
-                    for i in 0..z.len() {
-                        let mut file = z.by_index(i)?;
-                        let outpath = target.join(crate::utils::strip_first_component(file.name()));
-                        if file.is_dir() {
-                            std::fs::create_dir_all(&outpath)?;
-                        } else {
-                            if let Some(parent) = outpath.parent() {
-                                std::fs::create_dir_all(parent)?;
-                            }
-                            let mut out = std::fs::File::create(&outpath)?;
-                            std::io::copy(&mut file, &mut out)?;
-                        }
-                    }
-                }
-                "gz" | "tgz" | "tar" => {
-                    let f = std::fs::File::open(&p)?;
-                    let reader = std::io::BufReader::new(f);
-                    if ext == "gz" || ext == "tgz" {
-                        let mut gz = flate2::read::GzDecoder::new(reader);
-                        let mut ar = tar::Archive::new(&mut gz);
-                        ar.unpack(&target)?;
-                    } else {
-                        let mut ar = tar::Archive::new(reader);
-                        ar.unpack(&target)?;
-                    }
-                }
-                _ => {
-                    if try_extract_zip(&p, &target).is_ok() {
-                    } else {
-                        try_extract_tar_gz(&p, &target)?;
-                    }
-                }
-            }
-        } else if try_extract_zip(&p, &target).is_ok() {
+        let _cpu = cpu_guard;
+        if try_extract_zip(&cache_path_clone, &target).is_ok() {
+            return Ok(());
         } else {
-            try_extract_tar_gz(&p, &target)?;
+            try_extract_tar_gz(&cache_path_clone, &target)?;
         }
         Ok(())
     })

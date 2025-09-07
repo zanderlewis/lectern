@@ -10,7 +10,7 @@ pub fn parse_constraint(spec: &str) -> Result<VersionReq> {
         return Ok(VersionReq::STAR);
     }
 
-    // Handle OR constraints (both | and ||) - pick the highest version
+    // Handle OR constraints (both | and ||) by selecting the most permissive constraint
     if spec.contains('|') {
         let parts: Vec<&str> = if spec.contains("||") {
             spec.split("||").collect()
@@ -18,30 +18,66 @@ pub fn parse_constraint(spec: &str) -> Result<VersionReq> {
             spec.split('|').collect()
         };
         
-        // For OR constraints like "^2|^3", prefer the higher version
+        // Try to parse each constraint and find the most permissive one
         let mut best_constraint = None;
-        let mut highest_major = 0;
+        let mut best_score = 0;
         
-        for part in parts {
+        for part in &parts {
             let trimmed = part.trim();
-            if let Some(version_part) = trimmed.strip_prefix('^') {
-                if let Ok(major) = version_part.split('.').next().unwrap_or("0").parse::<u32>() {
-                    if major > highest_major {
-                        highest_major = major;
-                        best_constraint = Some(trimmed);
+            if !trimmed.is_empty() {
+                if let Ok(constraint) = parse_simple_constraint(trimmed) {
+                    // Score constraints by how permissive they are
+                    let score = score_constraint_permissiveness(trimmed);
+                    if score > best_score {
+                        best_score = score;
+                        best_constraint = Some(constraint);
                     }
                 }
-            } else if best_constraint.is_none() {
-                best_constraint = Some(trimmed);
             }
         }
         
-        if let Some(constraint_str) = best_constraint {
-            return parse_simple_constraint(constraint_str);
+        if let Some(constraint) = best_constraint {
+            return Ok(constraint);
+        }
+        
+        // Fallback: just use the first valid constraint
+        for part in &parts {
+            let trimmed = part.trim();
+            if !trimmed.is_empty() {
+                if let Ok(constraint) = parse_simple_constraint(trimmed) {
+                    return Ok(constraint);
+                }
+            }
         }
     }
 
     parse_simple_constraint(spec)
+}
+
+/// Score constraint permissiveness (higher = more permissive)
+fn score_constraint_permissiveness(constraint: &str) -> i32 {
+    // Prefer constraints that cover larger version ranges
+    if constraint.starts_with(">=") && !constraint.contains('<') {
+        return 100; // Very permissive (>=X.0.0)
+    }
+    if constraint.starts_with('^') {
+        if let Some(version_part) = constraint.strip_prefix('^') {
+            if let Ok(major) = version_part.split('.').next().unwrap_or("0").parse::<u32>() {
+                return 50 + major as i32; // Higher major versions get higher scores
+            }
+        }
+        return 50; // Caret constraints are generally permissive
+    }
+    if constraint.starts_with('~') {
+        return 30; // Tilde constraints are less permissive
+    }
+    if constraint.starts_with('=') {
+        return 10; // Exact constraints are least permissive
+    }
+    if constraint.starts_with(">=") && constraint.contains('<') {
+        return 40; // Range constraints
+    }
+    20 // Default score
 }
 
 fn parse_simple_constraint(spec: &str) -> Result<VersionReq> {
@@ -75,10 +111,10 @@ fn parse_simple_constraint(spec: &str) -> Result<VersionReq> {
         return Ok(VersionReq::parse(spec)?);
     }
 
-    // Treat as exact version and make it caret-compatible
+    // Treat as exact version
     let normalized = normalize_semver_string(spec)?;
     if Version::parse(&normalized).is_ok() {
-        return Ok(VersionReq::parse(&format!("^{normalized}"))?);
+        return Ok(VersionReq::parse(&format!("={normalized}"))?);
     }
 
     // Last resort
@@ -121,26 +157,36 @@ fn normalize_semver_string(s: &str) -> Result<String> {
         (s, None)
     };
 
-    // Split and normalize version parts
+    // Split and validate version parts
     let parts: Vec<&str> = version_part.split('.').collect();
+    if parts.is_empty() {
+        return Err(anyhow::anyhow!("Invalid version: empty"));
+    }
+
     let major = parts.first().unwrap_or(&"0");
     let minor = parts.get(1).unwrap_or(&"0");
     let patch = parts.get(2).unwrap_or(&"0");
 
-    // Clean each part
-    let clean_part = |part: &str| -> String {
-        if part.chars().all(char::is_numeric) {
-            part.parse::<u32>().unwrap_or(0).to_string()
+    // Validate and clean each part
+    let clean_part = |part: &str| -> Result<String> {
+        if part.chars().all(char::is_numeric) && !part.is_empty() {
+            Ok(part.parse::<u32>().unwrap_or(0).to_string())
+        } else if part == "*" {
+            Ok("0".to_string())
         } else {
-            "0".to_string()
+            Err(anyhow::anyhow!("Invalid version part: {}", part))
         }
     };
 
+    let major_clean = clean_part(major)?;
+    let minor_clean = clean_part(minor)?;
+    let patch_clean = clean_part(patch)?;
+
     let normalized = format!(
         "{}.{}.{}",
-        clean_part(major),
-        clean_part(minor),
-        clean_part(patch)
+        major_clean,
+        minor_clean,
+        patch_clean
     );
 
     if let Some(suffix) = stability_suffix {

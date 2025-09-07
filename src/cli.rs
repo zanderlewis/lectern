@@ -4,7 +4,8 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(
     name = "lectern",
-    about = "Modern PHP dependency manager with Lectern.toml configuration"
+    about = "Modern PHP dependency manager with Lectern.toml configuration",
+    version
 )]
 pub struct Cli {
     /// Working directory (defaults to current dir)
@@ -36,7 +37,7 @@ pub struct Cli {
     pub memory_limit: u32,
 
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]

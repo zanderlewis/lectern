@@ -1,8 +1,12 @@
+# Lectern specific
+.lectern_cache/
+
 # Cargo specific
 target/
 
 # Manual Tests
 test*/
+!tests/
 
 # OS specific
 .DS_Store
