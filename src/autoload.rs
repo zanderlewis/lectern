@@ -5,7 +5,11 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-/// Generate vendor/autoload.php, autoload_psr4.php, autoload_classmap.php
+/// Generate vendor/autoload.php, `autoload_psr4.php`, `autoload_classmap.php`
+/// # Errors
+/// Returns an error if the autoload files cannot be written
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::cognitive_complexity)]
 pub async fn write_autoload_files(
     project_dir: &Path,
     composer: &ComposerJson,
@@ -49,11 +53,13 @@ pub async fn write_autoload_files(
     // write autoload_psr4.php
     let mut s = String::from("<?php\nreturn [\n");
     for (ns, dir) in psr4_map {
-        s.push_str(&format!(
-            "  '{}' => '{}',\n",
-            ns.replace("'", "\\'"),
-            dir.replace("'", "\\'")
-        ));
+        use std::fmt::Write;
+        writeln!(
+            &mut s,
+            "  '{}' => '{}',",
+            ns.replace('\'', "\\'"),
+            dir.replace('\'', "\\'")
+        ).unwrap();
     }
     s.push_str("];\n");
     tokio::fs::write(composer_dir.join("autoload_psr4.php"), s).await?;
@@ -64,9 +70,9 @@ pub async fn write_autoload_files(
         for entry in &a.classmap {
             let p = project_dir.join(entry);
             if p.exists() {
-                for e in WalkDir::new(&p).into_iter().filter_map(|r| r.ok()) {
+                for e in WalkDir::new(&p).into_iter().filter_map(std::result::Result::ok) {
                     if e.file_type().is_file()
-                        && e.path().extension().map(|e| e == "php").unwrap_or(false)
+                        && e.path().extension().is_some_and(|e| e == "php")
                     {
                         classmap_entries.push(e.path().to_string_lossy().to_string());
                     }
@@ -88,13 +94,12 @@ pub async fn write_autoload_files(
                                     let root = pkg_path.join(dir);
                                     if root.exists() {
                                         for e in
-                                            WalkDir::new(&root).into_iter().filter_map(|r| r.ok())
+                                            WalkDir::new(&root).into_iter().filter_map(std::result::Result::ok)
                                         {
                                             if e.file_type().is_file()
                                                 && e.path()
                                                     .extension()
-                                                    .map(|e| e == "php")
-                                                    .unwrap_or(false)
+                                                    .is_some_and(|e| e == "php")
                                             {
                                                 classmap_entries
                                                     .push(e.path().to_string_lossy().to_string());
@@ -113,11 +118,13 @@ pub async fn write_autoload_files(
     // write classmap
     let mut cm = String::from("<?php\nreturn [\n");
     for p in classmap_entries {
-        cm.push_str(&format!(
-            "  '{}' => '{}',\n",
-            p.replace("'", "\\'"),
-            p.replace("'", "\\'")
-        ));
+        use std::fmt::Write;
+        writeln!(
+            &mut cm,
+            "  '{}' => '{}',",
+            p.replace('\'', "\\'"),
+            p.replace('\'', "\\'")
+        ).unwrap();
     }
     cm.push_str("];\n");
     tokio::fs::write(composer_dir.join("autoload_classmap.php"), cm).await?;

@@ -69,6 +69,7 @@ pub enum Commands {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct InstallArgs {
     /// Don't install dev dependencies
     #[arg(long = "no-dev")]
@@ -96,6 +97,7 @@ pub struct InstallArgs {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct UpdateArgs {
     /// Packages to update (empty = all)
     pub packages: Vec<String>,
@@ -130,6 +132,7 @@ pub struct UpdateArgs {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct RequireArgs {
     /// Packages to add (format: vendor/package:constraint)
     pub packages: Vec<String>,
@@ -156,6 +159,7 @@ pub struct RequireArgs {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct RemoveArgs {
     /// Packages to remove
     pub packages: Vec<String>,
@@ -178,6 +182,7 @@ pub struct RemoveArgs {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ShowArgs {
     /// Package name to show info for
     pub package: Option<String>,
@@ -204,6 +209,7 @@ pub struct ShowArgs {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct DumpAutoloadArgs {
     /// Optimize autoloader (PSR-4 to classmap)
     #[arg(long = "optimize", short = 'o')]
@@ -213,7 +219,7 @@ pub struct DumpAutoloadArgs {
     #[arg(long = "classmap-authoritative")]
     pub classmap_authoritative: bool,
 
-    /// Use APCu cache
+    /// Use `APCu` cache
     #[arg(long = "apcu")]
     pub apcu: bool,
 

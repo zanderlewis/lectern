@@ -145,6 +145,7 @@ pub async fn fetch_packagist_versions_cached(client: &Client, pkg: &str) -> Resu
     let url = format!("https://repo.packagist.org/p2/{pkg}.json");
     let resp = client
         .get(&url)
+        .timeout(std::time::Duration::from_secs(30))  // Add timeout
         .send()
         .await
         .context("packagist request")?
@@ -167,6 +168,53 @@ pub async fn fetch_packagist_versions_cached(client: &Client, pkg: &str) -> Resu
     let list = env.packages.get(pkg).cloned().unwrap_or_default();
     cache::cache_set_meta(&format!("p2:{pkg}"), serde_json::to_value(&list)?).await;
     Ok(list)
+}
+
+/// Fetch multiple packages concurrently for better performance
+pub async fn fetch_packagist_versions_bulk(client: &Client, packages: &[String]) -> Result<BTreeMap<String, Vec<P2Version>>> {
+    let mut results = BTreeMap::new();
+    
+    // First check cache for all packages
+    let cache_keys: Vec<String> = packages.iter().map(|pkg| format!("p2:{pkg}")).collect();
+    let cached_results = cache::cache_get_multiple_package_info(&cache_keys).await;
+    
+    let mut packages_to_fetch = Vec::new();
+    
+    for pkg in packages {
+        let cache_key = format!("p2:{pkg}");
+        if let Some(cached) = cached_results.get(&cache_key) {
+            if let Ok(list) = serde_json::from_value::<Vec<P2Version>>(cached.clone()) {
+                results.insert(pkg.clone(), list);
+                continue;
+            }
+        }
+        packages_to_fetch.push(pkg.clone());
+    }
+    
+    if packages_to_fetch.is_empty() {
+        return Ok(results);
+    }
+    
+    // Fetch uncached packages concurrently
+    let mut futures = FuturesUnordered::new();
+    
+    for pkg in packages_to_fetch {
+        let client = client.clone();
+        futures.push(async move {
+            match fetch_packagist_versions_cached(&client, &pkg).await {
+                Ok(versions) => Some((pkg, versions)),
+                Err(_) => None,
+            }
+        });
+    }
+    
+    while let Some(result) = futures.next().await {
+        if let Some((pkg, versions)) = result {
+            results.insert(pkg, versions);
+        }
+    }
+    
+    Ok(results)
 }
 
 /// Check if a package name represents a platform dependency

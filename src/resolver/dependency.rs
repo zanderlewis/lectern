@@ -1,6 +1,6 @@
 use crate::model::{ComposerJson, LockedPackage, SourceInfo, DistInfo};
 use crate::resolver::packagist::{
-    P2Version, fetch_packagist_versions_cached, is_platform_dependency,
+    P2Version, fetch_packagist_versions_cached, fetch_packagist_versions_bulk, is_platform_dependency,
 };
 use crate::resolver::version::parse_constraint;
 use crate::utils::{print_error, print_info, print_step, print_success, print_warning};
@@ -11,7 +11,7 @@ use std::collections::{BTreeSet, VecDeque, BTreeMap};
 use std::path::Path;
 use sha2::{Sha256, Digest};
 
-/// Main dependency resolution function
+/// Main dependency resolution function with batch processing optimization
 pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
     print_step("🔍 Resolving dependencies...");
 
@@ -21,6 +21,9 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
     let mut queue = VecDeque::new();
     let mut dev_package_names = BTreeSet::new();
 
+    // Collect all dependencies first for batch processing
+    let mut all_deps = Vec::new();
+    
     // Add all direct dependencies to the queue
     for (name, constraint) in &composer.require {
         // Skip platform dependencies
@@ -29,6 +32,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
             continue;
         }
         queue.push_back((name.clone(), constraint.clone(), false));
+        all_deps.push(name.clone());
     }
 
     for (name, constraint) in &composer.require_dev {
@@ -39,6 +43,14 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
         }
         dev_package_names.insert(name.clone());
         queue.push_back((name.clone(), constraint.clone(), true));
+        all_deps.push(name.clone());
+    }
+
+    // Pre-fetch all direct dependencies in bulk for better performance
+    if !all_deps.is_empty() {
+        print_info(&format!("📥 Pre-fetching {} dependencies in batch...", all_deps.len()));
+        let _bulk_versions = fetch_packagist_versions_bulk(&client, &all_deps).await.unwrap_or_default();
+        print_success("✅ Batch pre-fetch completed");
     }
 
     while let Some((pkg_name, constraint_str, is_dev)) = queue.pop_front() {

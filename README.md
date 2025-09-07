@@ -10,7 +10,7 @@ Lectern is not a complete replacement for Composer just yet! Some things I haven
 This image is the performance comparison for Lectern and Composer cache hits on various different commands (lower is better):
 ![Performance Comparison](benchmarks/charts/performance_comparison.png)
 
-Lectern is in orange, and clearly shows that (especially for outdated checks on larger projects) Lectern is much faster than Composer!
+Lectern is in orange, and clearly shows that Lectern is much faster than Composer! However, some commands are slower than Composer, but these commands are likely not used often.
 
 This chart shows the average performance based on command category, and the execution time between Lectern and Composer for each category.
 ![Speedup Chart](benchmarks/charts/category_performance.png)

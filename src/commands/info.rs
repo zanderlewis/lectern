@@ -6,6 +6,10 @@ use semver::Version;
 use std::path::Path;
 
 /// Check for outdated packages
+/// # Errors
+/// Returns an error if the lock file cannot be read or packages cannot be fetched
+/// # Panics
+/// May panic if version parsing fails unexpectedly
 pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<()> {
     if !quiet {
         print_info("🔍 Checking for outdated packages...");
@@ -120,9 +124,11 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
 }
 
 /// Show licenses of all dependencies
+/// # Errors
+/// Returns an error if the lock file cannot be read
 pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result<()> {
     if !quiet {
-        print_info("📜 Fetching license information...");
+        print_info("📜 Reading license information from lock file...");
     }
 
     let lock_path = working_dir.join("composer.lock");
@@ -142,46 +148,22 @@ pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result
         return Ok(());
     }
 
-    // Collect package names for bulk fetching (both regular and dev)
-    let mut package_names: Vec<String> = lock.packages.iter().map(|p| p.name.clone()).collect();
-    package_names.extend(lock.packages_dev.iter().map(|p| p.name.clone()));
-
-    // Fetch package info for all packages concurrently
-    let package_infos = fetch_multiple_package_info(&package_names).await?;
-
     let mut table_rows = Vec::new();
 
-    for (package_name, package_info_opt) in package_infos {
-        // Check both regular and dev packages
-        let locked_pkg = lock.packages.iter().find(|p| p.name == package_name)
-            .or_else(|| lock.packages_dev.iter().find(|p| p.name == package_name));
+    // Process regular packages
+    for pkg in &lock.packages {
+        let license_info = pkg.license.as_ref()
+            .map_or_else(|| "Unknown".to_string(), |licenses| licenses.join(", "));
         
-        if let Some(locked_pkg) = locked_pkg {
-            let mut license_info = "Unknown".to_string();
+        table_rows.push((pkg.name.clone(), pkg.version.clone(), license_info));
+    }
 
-            if let Some(package_info) = package_info_opt {
-                if let Some(versions) = &package_info.package.versions {
-                    // Look for license in the current version
-                    if let Some(version_details) = versions.get(&locked_pkg.version) {
-                        if let Some(licenses) = &version_details.license {
-                            license_info = licenses.join(", ");
-                        }
-                    }
-
-                    // Fallback: look in any version
-                    if license_info == "Unknown" {
-                        for details in versions.values() {
-                            if let Some(licenses) = &details.license {
-                                license_info = licenses.join(", ");
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            table_rows.push((package_name, locked_pkg.version.clone(), license_info));
-        }
+    // Process dev packages
+    for pkg in &lock.packages_dev {
+        let license_info = pkg.license.as_ref()
+            .map_or_else(|| "Unknown".to_string(), |licenses| licenses.join(", "));
+        
+        table_rows.push((pkg.name.clone(), pkg.version.clone(), license_info));
     }
 
     if !quiet {
@@ -190,15 +172,21 @@ pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result
         println!("{}", "-".repeat(80));
 
         table_rows.sort_by(|a, b| a.0.cmp(&b.0));
+        let package_count = table_rows.len();
+        
         for (name, version, license) in table_rows {
             println!("{name:<40} {version:<15} {license}");
         }
+        
+        print_success(&format!("📊 Listed licenses for {package_count} packages"));
     }
 
     Ok(())
 }
 
 /// Show status of all dependencies
+/// # Errors
+/// Returns an error if the lock file cannot be read
 pub async fn show_dependency_status(working_dir: &Path) -> Result<()> {
     print_info("📊 Checking dependency status...");
 
@@ -214,7 +202,7 @@ pub async fn show_dependency_status(working_dir: &Path) -> Result<()> {
     let total_packages = lock.packages.len() + lock.packages_dev.len();
 
     if total_packages > 0 {
-        println!("\n📦 Installed Packages ({} total):", total_packages);
+        println!("\n📦 Installed Packages ({total_packages} total):");
         println!("{:<40} {:<15} Type", "Package", "Version");
         println!("{}", "-".repeat(70));
 
@@ -227,7 +215,7 @@ pub async fn show_dependency_status(working_dir: &Path) -> Result<()> {
             println!("{:<40} {:<15} (dev)", pkg.name, pkg.version);
         }
 
-        print_success(&format!("✅ {} packages installed", total_packages));
+        print_success(&format!("✅ {total_packages} packages installed"));
     } else {
         print_info("📦 No packages installed.");
     }
@@ -236,6 +224,8 @@ pub async fn show_dependency_status(working_dir: &Path) -> Result<()> {
 }
 
 /// Search for packages on Packagist
+/// # Errors
+/// Returns an error if the search request fails
 pub async fn search_packages(terms: &[String], _working_dir: &Path) -> Result<()> {
     if terms.is_empty() {
         print_error("❌ Please provide search terms");
@@ -264,9 +254,7 @@ pub async fn search_packages(terms: &[String], _working_dir: &Path) -> Result<()
         };
 
         let downloads = result
-            .downloads
-            .map(|d| d.to_string())
-            .unwrap_or_else(|| "N/A".to_string());
+            .downloads.map_or_else(|| "N/A".to_string(), |d| d.to_string());
 
         println!("{:<30} {:<50} {}", result.name, short_desc, downloads);
     }
@@ -275,6 +263,8 @@ pub async fn search_packages(terms: &[String], _working_dir: &Path) -> Result<()
 }
 
 /// Show detailed information about a specific package
+/// # Errors
+/// Returns an error if the package information cannot be fetched
 pub async fn show_package_details(package: &str, _working_dir: &Path) -> Result<()> {
     print_info(&format!("📦 Fetching details for: {package}"));
 
