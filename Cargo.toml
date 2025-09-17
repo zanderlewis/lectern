@@ -6,6 +6,7 @@ authors = ["Zander Lewis <zander@zanderlewis.dev>"]
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/zanderlewis/lectern"
+description = "Lightning-fast PHP Composer alternative written in Rust"
 
 [[bin]]
 name = "lectern"
