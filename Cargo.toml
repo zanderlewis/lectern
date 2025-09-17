@@ -1,8 +1,11 @@
 [package]
 name = "lectern"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 authors = ["Zander Lewis <zander@zanderlewis.dev>"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/zanderlewis/lectern"
 
 [[bin]]
 name = "lectern"
