@@ -1,0 +1,82 @@
+name: Clippy on PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  clippy:
+    name: Run clippy and comment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run cargo clippy (capture JSON diagnostics)
+        run: |
+          set -o pipefail
+          mkdir -p clippy-output
+          cargo clippy --all-targets --all-features --message-format=json-render-diagnostics 2>&1 | tee clippy-output/clippy.json || true
+        shell: bash
+
+      - name: Post Clippy results as PR comment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = 'clippy-output/clippy.json';
+            if (!fs.existsSync(path)) {
+              console.log('No clippy output found');
+              return;
+            }
+            const lines = fs.readFileSync(path, 'utf8').split('\n').filter(Boolean);
+            const diagnostics = [];
+            for (const line of lines) {
+              try {
+                const obj = JSON.parse(line);
+                if (obj.reason === 'compiler-message' && obj.message) {
+                  const level = obj.message.level;
+                  if (['warning','error','note'].includes(level)) {
+                    const spans = obj.message.spans || [];
+                    const primary = spans.find(s => s.is_primary) || spans[0];
+                    const file = primary ? `${primary.file_name}:${primary.line_start}:${primary.column_start}` : '';
+                    diagnostics.push({level, file, message: obj.message.message});
+                  }
+                }
+              } catch (e) {
+                // ignore parse errors
+              }
+            }
+
+            let body = '';
+            if (diagnostics.length === 0) {
+              body = '✅ Clippy: no warnings or errors found.';
+            } else {
+              body = `⚠️ Clippy found ${diagnostics.length} issue(s):\n\n`;
+              for (const d of diagnostics.slice(0,50)) {
+                body += `- **${d.level}** in \`${d.file}\`: ${d.message}\n`;
+              }
+              if (diagnostics.length > 50) {
+                body += `\n...and ${diagnostics.length - 50} more issues.\n`;
+              }
+              body += `\n> Tip: run \`cargo clippy --all-targets --all-features\` locally to see details.`;
+            }
+
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              console.log('Not a pull request event, skipping comment.');
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body
+            });
