@@ -44,3 +44,9 @@ pub fn print_warning(message: &str) {
 pub fn print_step(message: &str) {
     println!("{} {}", "[STEP]".cyan().bold(), message);
 }
+
+/// Return true if the version string indicates a pre-release (alpha/beta/rc/dev)
+pub fn is_prerelease_version(version_str: &str) -> bool {
+    let s = version_str.to_ascii_lowercase();
+    s.contains("dev") || s.contains("alpha") || s.contains("beta") || s.contains("rc")
+}

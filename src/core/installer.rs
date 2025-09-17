@@ -9,7 +9,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::Semaphore;
 use tokio::task;
 
-use crate::model::LockedPackage;
+use crate::models::model::LockedPackage;
 use crate::utils;
 
 #[allow(dead_code)]

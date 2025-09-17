@@ -10,7 +10,7 @@ use lectern::{
     },
     installer::{InstalledPackage, install_packages},
     io::{read_composer_json, read_lock, write_lock},
-    model::*,
+    models::model::*,
     resolver::solve,
     utils::*,
 };
@@ -200,7 +200,7 @@ async fn main() -> Result<()> {
                 validate_composer_json(working_dir, &args)?;
             }
         },
-        None => {
+        _ => {
             // No command provided, show help
             use clap::CommandFactory;
             Cli::command().print_help()?;

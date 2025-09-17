@@ -7,6 +7,7 @@ use semver::Version;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use crate::utils::is_prerelease_version;
 
 /// Check for outdated packages with incremental updates
 /// # Errors
@@ -102,11 +103,7 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
 
                     for version_str in versions.keys() {
                         // Skip dev versions and pre-releases for "latest" comparison
-                        if version_str.contains("dev")
-                            || version_str.contains("alpha")
-                            || version_str.contains("beta")
-                            || version_str.contains("rc")
-                        {
+                        if is_prerelease_version(version_str.as_str()) {
                             continue;
                         }
 

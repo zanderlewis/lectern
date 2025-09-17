@@ -1,5 +1,5 @@
 use crate::installer::InstalledPackage;
-use crate::model::ComposerJson;
+use crate::models::model::ComposerJson;
 use anyhow::Result;
 use std::fs;
 use std::path::Path;

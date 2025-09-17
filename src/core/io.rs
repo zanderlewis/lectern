@@ -1,4 +1,4 @@
-use crate::model::{ComposerJson, Lock};
+use crate::models::model::{ComposerJson, Lock};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;

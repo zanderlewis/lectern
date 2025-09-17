@@ -1,4 +1,4 @@
-use lectern::model::{ComposerJson, DistInfo, Lock, LockedPackage, SourceInfo};
+use lectern::models::model::{ComposerJson, DistInfo, Lock, LockedPackage, SourceInfo};
 use std::collections::BTreeMap;
 
 #[test]

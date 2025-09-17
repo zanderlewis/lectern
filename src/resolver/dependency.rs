@@ -1,4 +1,4 @@
-use crate::model::{ComposerJson, DistInfo, LockedPackage, SourceInfo};
+use crate::models::model::{ComposerJson, DistInfo, LockedPackage, SourceInfo};
 use crate::resolver::packagist::{
     P2Version, fetch_packagist_versions_bulk, fetch_packagist_versions_cached,
     is_platform_dependency,
@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
 
 /// Main dependency resolution function with batch processing optimization
-pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
+pub async fn solve(composer: &ComposerJson) -> Result<crate::models::model::Lock> {
     print_step("🔍 Resolving dependencies...");
 
     let client = Client::new();
@@ -279,7 +279,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
     // Generate content hash for the lock file
     let content_hash = generate_content_hash_from_composer(composer);
 
-    Ok(crate::model::Lock {
+    Ok(crate::models::model::Lock {
         _readme: vec![
             "This file locks the dependencies of your project to a known state".to_string(),
             "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies".to_string(),
