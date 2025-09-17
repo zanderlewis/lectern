@@ -159,8 +159,8 @@ impl TrackingAllocator {
         }
     }
 
-    pub fn used_memory(&self) -> Result<usize, ()> {
-        Ok(self.allocated.load(Ordering::Relaxed))
+    pub fn used_memory(&self) -> usize {
+        self.allocated.load(Ordering::Relaxed)
     }
 }
 
