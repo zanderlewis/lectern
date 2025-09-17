@@ -154,7 +154,7 @@ pub struct Autoload {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Repository {
-    Composer { 
+    Composer {
         url: String,
         #[serde(default)]
         canonical: Option<bool>,
@@ -165,7 +165,7 @@ pub enum Repository {
         #[serde(default)]
         options: Option<serde_json::Value>,
     },
-    Vcs { 
+    Vcs {
         url: String,
         #[serde(default)]
         canonical: Option<bool>,
@@ -176,7 +176,7 @@ pub enum Repository {
         #[serde(default)]
         options: Option<serde_json::Value>,
     },
-    Path { 
+    Path {
         url: String,
         #[serde(default)]
         canonical: Option<bool>,
@@ -196,7 +196,7 @@ pub enum Repository {
         #[serde(default)]
         exclude: Option<Vec<String>>,
     },
-    Artifact { 
+    Artifact {
         url: String,
         #[serde(default)]
         canonical: Option<bool>,
@@ -205,7 +205,7 @@ pub enum Repository {
         #[serde(default)]
         exclude: Option<Vec<String>>,
     },
-    Pear { 
+    Pear {
         url: String,
         #[serde(default)]
         canonical: Option<bool>,

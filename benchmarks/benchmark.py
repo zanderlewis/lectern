@@ -106,7 +106,7 @@ class LecternBenchmark:
     def backup_project_files(self, test_dir: Path) -> dict:
         """Backup important project files before modification"""
         backups = {}
-        for file_name in ["composer.json", "composer.lock", "Lectern.lock"]:
+        for file_name in ["composer.json", "composer.lock"]:
             file_path = test_dir / file_name
             if file_path.exists():
                 backups[file_name] = file_path.read_text()
@@ -119,7 +119,7 @@ class LecternBenchmark:
             file_path.write_text(content)
 
         # Remove any files that weren't in the backup
-        for file_name in ["composer.json", "composer.lock", "Lectern.lock"]:
+        for file_name in ["composer.json", "composer.lock"]:
             if file_name not in backups:
                 file_path = test_dir / file_name
                 if file_path.exists():
@@ -235,7 +235,7 @@ class LecternBenchmark:
             self.test_command(
                 "Show Package Info",
                 ["show", "laravel/framework"],
-                ["show", "laravel/framework"],
+                ["show", "--available", "laravel/framework"],
             )
         )
 

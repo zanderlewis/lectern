@@ -4,7 +4,7 @@ use semver::{Version, VersionReq};
 /// Parse a constraint string into a semver VersionReq
 pub fn parse_constraint(spec: &str) -> Result<VersionReq> {
     let spec = spec.trim();
-    
+
     // Handle special cases
     if spec == "*" || spec.is_empty() {
         return Ok(VersionReq::STAR);
@@ -17,11 +17,11 @@ pub fn parse_constraint(spec: &str) -> Result<VersionReq> {
         } else {
             spec.split('|').collect()
         };
-        
+
         // Try to parse each constraint and find the most permissive one
         let mut best_constraint = None;
         let mut best_score = 0;
-        
+
         for part in &parts {
             let trimmed = part.trim();
             if !trimmed.is_empty() {
@@ -35,11 +35,11 @@ pub fn parse_constraint(spec: &str) -> Result<VersionReq> {
                 }
             }
         }
-        
+
         if let Some(constraint) = best_constraint {
             return Ok(constraint);
         }
-        
+
         // Fallback: just use the first valid constraint
         for part in &parts {
             let trimmed = part.trim();
@@ -89,9 +89,13 @@ fn parse_simple_constraint(spec: &str) -> Result<VersionReq> {
     }
 
     // Handle caret, tilde, and comparison operators
-    if spec.starts_with('^') || spec.starts_with('~') || 
-       spec.starts_with(">=") || spec.starts_with("<=") || 
-       spec.starts_with('>') || spec.starts_with('<') {
+    if spec.starts_with('^')
+        || spec.starts_with('~')
+        || spec.starts_with(">=")
+        || spec.starts_with("<=")
+        || spec.starts_with('>')
+        || spec.starts_with('<')
+    {
         let normalized = normalize_version_in_constraint(spec)?;
         return Ok(VersionReq::parse(&normalized)?);
     }
@@ -182,12 +186,7 @@ fn normalize_semver_string(s: &str) -> Result<String> {
     let minor_clean = clean_part(minor)?;
     let patch_clean = clean_part(patch)?;
 
-    let normalized = format!(
-        "{}.{}.{}",
-        major_clean,
-        minor_clean,
-        patch_clean
-    );
+    let normalized = format!("{major_clean}.{minor_clean}.{patch_clean}");
 
     if let Some(suffix) = stability_suffix {
         Ok(format!("{normalized}{suffix}"))

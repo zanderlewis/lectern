@@ -1,11 +1,14 @@
-use crate::io::read_lock;
-use crate::resolver::{fetch_multiple_package_info, fetch_package_info, search_packagist};
+use crate::io::{read_lock, write_cache, read_cache};
+use crate::resolver::{fetch_package_info, search_packagist};
 use crate::utils::{print_error, print_info, print_success};
 use anyhow::Result;
+use futures::stream::{self, StreamExt};
 use semver::Version;
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
-/// Check for outdated packages
+/// Check for outdated packages with incremental updates
 /// # Errors
 /// Returns an error if the lock file cannot be read or packages cannot be fetched
 /// # Panics
@@ -23,8 +26,8 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
     }
 
     let lock = read_lock(&lock_path)?;
-
     let total_packages = lock.packages.len() + lock.packages_dev.len();
+
     if total_packages == 0 {
         if !quiet {
             print_info("📦 No packages installed.");
@@ -32,23 +35,62 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
         return Ok(());
     }
 
-    // Collect package names for bulk fetching (both regular and dev)
     let mut package_names: Vec<String> = lock.packages.iter().map(|p| p.name.clone()).collect();
     package_names.extend(lock.packages_dev.iter().map(|p| p.name.clone()));
 
-    // Fetch package info for all packages concurrently
-    let package_infos = fetch_multiple_package_info(&package_names).await?;
+    // Load cached state
+    let cache_path = Path::new("cache.json");
+    let mut cached_versions: HashMap<String, String> = if cache_path.exists() {
+        read_cache(&cache_path).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    // Determine packages to fetch
+    let packages_to_fetch: Vec<String> = package_names
+        .iter()
+        .filter(|name| {
+            if let Some(locked_pkg) = lock.packages.iter().find(|p| &p.name == *name) {
+                cached_versions.get(&**name) != Some(&locked_pkg.version)
+            } else {
+                true
+            }
+        })
+        .cloned()
+        .collect();
+
+    // Batch API requests for package info
+    let package_info_map = Arc::new(Mutex::new(HashMap::new()));
+    let concurrency_limit = 20;
+    stream::iter(packages_to_fetch.clone())
+        .map(|package_name| {
+            let package_info_map = Arc::clone(&package_info_map);
+            async move {
+                if let Ok(result) = fetch_package_info(&package_name).await {
+                    let mut map = package_info_map.lock().unwrap();
+                    map.insert(package_name, result);
+                }
+            }
+        })
+        .buffer_unordered(concurrency_limit)
+        .for_each(|_| async {})
+        .await;
+
+    let package_info_map = Arc::try_unwrap(package_info_map).unwrap().into_inner().unwrap();
 
     let mut outdated_count = 0;
     let mut table_rows = Vec::new();
 
-    for (package_name, package_info_opt) in package_infos {
+    for package_name in package_names.clone() {
         // Look in both regular and dev packages
-        let locked_pkg = lock.packages.iter().find(|p| p.name == package_name)
+        let locked_pkg = lock
+            .packages
+            .iter()
+            .find(|p| p.name == package_name)
             .or_else(|| lock.packages_dev.iter().find(|p| p.name == package_name));
-        
+
         if let Some(locked_pkg) = locked_pkg {
-            if let Some(package_info) = package_info_opt {
+            if let Some(package_info) = package_info_map.get(&package_name) {
                 if let Some(versions) = &package_info.package.versions {
                     // Find the latest stable version
                     let mut latest_version = None;
@@ -71,7 +113,9 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
                         // Try to parse the version
                         let clean_version = version_str.trim_start_matches('v');
                         if let Ok(parsed_version) = Version::parse(clean_version) {
-                            if latest_parsed.is_none() || parsed_version > *latest_parsed.as_ref().unwrap() {
+                            if latest_parsed.is_none()
+                                || parsed_version > *latest_parsed.as_ref().unwrap()
+                            {
                                 latest_parsed = Some(parsed_version);
                                 latest_version = Some(version_str.clone());
                             }
@@ -79,8 +123,9 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
                     }
 
                     // Check if the latest version is newer than current
-                    if let (Some(current), Some(latest_ver), Some(latest_str)) = 
-                        (current_parsed, latest_parsed, latest_version) {
+                    if let (Some(current), Some(latest_ver), Some(latest_str)) =
+                        (current_parsed, latest_parsed, latest_version)
+                    {
                         if latest_ver > current {
                             outdated_count += 1;
                             table_rows.push((
@@ -96,12 +141,20 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
         }
     }
 
+    // Update cache
+    for package_name in package_names {
+        if let Some(locked_pkg) = lock.packages.iter().find(|p| p.name == package_name) {
+            cached_versions.insert(package_name, locked_pkg.version.clone());
+        }
+    }
+    write_cache(&cache_path, &cached_versions)?;
+
     if outdated_count == 0 {
         if !quiet {
             print_success("✅ All packages are up to date!");
         }
     } else if !quiet {
-        println!("\n📊 Outdated Packages ({outdated_count} found):");
+        println!("\n📊 Outdated Packages ({} found):", outdated_count);
         println!(
             "{:<30} {:<15} {:<15} Description",
             "Package", "Current", "Latest"
@@ -114,7 +167,7 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
             } else {
                 desc
             };
-            println!("{name:<30} {current:<15} {latest:<15} {short_desc}");
+            println!("{:<30} {:<15} {:<15} {}", name, current, latest, short_desc);
         }
 
         println!("\nRun 'lectern update' to update packages.");
@@ -152,17 +205,21 @@ pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result
 
     // Process regular packages
     for pkg in &lock.packages {
-        let license_info = pkg.license.as_ref()
+        let license_info = pkg
+            .license
+            .as_ref()
             .map_or_else(|| "Unknown".to_string(), |licenses| licenses.join(", "));
-        
+
         table_rows.push((pkg.name.clone(), pkg.version.clone(), license_info));
     }
 
     // Process dev packages
     for pkg in &lock.packages_dev {
-        let license_info = pkg.license.as_ref()
+        let license_info = pkg
+            .license
+            .as_ref()
             .map_or_else(|| "Unknown".to_string(), |licenses| licenses.join(", "));
-        
+
         table_rows.push((pkg.name.clone(), pkg.version.clone(), license_info));
     }
 
@@ -173,11 +230,11 @@ pub async fn show_dependency_licenses(working_dir: &Path, quiet: bool) -> Result
 
         table_rows.sort_by(|a, b| a.0.cmp(&b.0));
         let package_count = table_rows.len();
-        
+
         for (name, version, license) in table_rows {
             println!("{name:<40} {version:<15} {license}");
         }
-        
+
         print_success(&format!("📊 Listed licenses for {package_count} packages"));
     }
 
@@ -254,7 +311,8 @@ pub async fn search_packages(terms: &[String], _working_dir: &Path) -> Result<()
         };
 
         let downloads = result
-            .downloads.map_or_else(|| "N/A".to_string(), |d| d.to_string());
+            .downloads
+            .map_or_else(|| "N/A".to_string(), |d| d.to_string());
 
         println!("{:<30} {:<50} {}", result.name, short_desc, downloads);
     }

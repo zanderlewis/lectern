@@ -59,7 +59,8 @@ pub async fn write_autoload_files(
             "  '{}' => '{}',",
             ns.replace('\'', "\\'"),
             dir.replace('\'', "\\'")
-        ).unwrap();
+        )
+        .unwrap();
     }
     s.push_str("];\n");
     tokio::fs::write(composer_dir.join("autoload_psr4.php"), s).await?;
@@ -70,10 +71,11 @@ pub async fn write_autoload_files(
         for entry in &a.classmap {
             let p = project_dir.join(entry);
             if p.exists() {
-                for e in WalkDir::new(&p).into_iter().filter_map(std::result::Result::ok) {
-                    if e.file_type().is_file()
-                        && e.path().extension().is_some_and(|e| e == "php")
-                    {
+                for e in WalkDir::new(&p)
+                    .into_iter()
+                    .filter_map(std::result::Result::ok)
+                {
+                    if e.file_type().is_file() && e.path().extension().is_some_and(|e| e == "php") {
                         classmap_entries.push(e.path().to_string_lossy().to_string());
                     }
                 }
@@ -93,13 +95,12 @@ pub async fn write_autoload_files(
                                 if let Some(dir) = it.as_str() {
                                     let root = pkg_path.join(dir);
                                     if root.exists() {
-                                        for e in
-                                            WalkDir::new(&root).into_iter().filter_map(std::result::Result::ok)
+                                        for e in WalkDir::new(&root)
+                                            .into_iter()
+                                            .filter_map(std::result::Result::ok)
                                         {
                                             if e.file_type().is_file()
-                                                && e.path()
-                                                    .extension()
-                                                    .is_some_and(|e| e == "php")
+                                                && e.path().extension().is_some_and(|e| e == "php")
                                             {
                                                 classmap_entries
                                                     .push(e.path().to_string_lossy().to_string());
@@ -124,7 +125,8 @@ pub async fn write_autoload_files(
             "  '{}' => '{}',",
             p.replace('\'', "\\'"),
             p.replace('\'', "\\'")
-        ).unwrap();
+        )
+        .unwrap();
     }
     cm.push_str("];\n");
     tokio::fs::write(composer_dir.join("autoload_classmap.php"), cm).await?;

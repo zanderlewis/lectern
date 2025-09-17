@@ -1,5 +1,5 @@
 //! Test utilities and strict testing helpers for Lectern
-//! 
+//!
 //! This module provides utilities for comprehensive, strict testing including:
 //! - Property-based testing helpers
 //! - Memory leak detection
@@ -9,8 +9,8 @@
 #![allow(dead_code, unused_imports)]
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 /// Strict assertion that tracks all assertion calls for coverage
 pub struct AssertionTracker {
@@ -36,9 +36,10 @@ impl AssertionTracker {
     pub fn assert_minimum_calls(&self, name: &str, min_calls: u32) {
         let calls = self.calls.lock().unwrap();
         let actual_calls = calls.get(name).unwrap_or(&0);
-        assert!(*actual_calls >= min_calls, 
-                "Assertion '{}' was called {} times, expected at least {}", 
-                name, actual_calls, min_calls);
+        assert!(
+            *actual_calls >= min_calls,
+            "Assertion '{name}' was called {actual_calls} times, expected at least {min_calls}"
+        );
     }
 }
 
@@ -60,17 +61,20 @@ impl PerformanceTracker {
         }
     }
 
-    pub fn time_operation<F, R>(&self, name: &str, operation: F) -> R 
-    where 
+    pub fn time_operation<F, R>(&self, name: &str, operation: F) -> R
+    where
         F: FnOnce() -> R,
     {
         let start = Instant::now();
         let result = operation();
         let duration = start.elapsed();
-        
+
         let mut benchmarks = self.benchmarks.lock().unwrap();
-        benchmarks.entry(name.to_string()).or_default().push(duration);
-        
+        benchmarks
+            .entry(name.to_string())
+            .or_default()
+            .push(duration);
+
         result
     }
 
@@ -78,11 +82,13 @@ impl PerformanceTracker {
         let benchmarks = self.benchmarks.lock().unwrap();
         if let Some(durations) = benchmarks.get(name) {
             let avg_duration = durations.iter().sum::<Duration>() / durations.len() as u32;
-            assert!(avg_duration <= max_duration,
-                    "Performance regression detected for '{}': average {} > maximum {}",
-                    name, 
-                    avg_duration.as_millis(),
-                    max_duration.as_millis());
+            assert!(
+                avg_duration <= max_duration,
+                "Performance regression detected for '{}': average {} > maximum {}",
+                name,
+                avg_duration.as_millis(),
+                max_duration.as_millis()
+            );
         }
     }
 
@@ -115,10 +121,13 @@ impl MemoryTracker {
         std::thread::sleep(Duration::from_millis(100)); // Allow cleanup
         let current_usage = Self::get_memory_usage();
         let increase = current_usage.saturating_sub(self.initial_usage);
-        
-        assert!(increase <= self.max_allowed_increase,
-                "Memory leak detected: usage increased by {} bytes (max allowed: {} bytes)",
-                increase, self.max_allowed_increase);
+
+        assert!(
+            increase <= self.max_allowed_increase,
+            "Memory leak detected: usage increased by {} bytes (max allowed: {} bytes)",
+            increase,
+            self.max_allowed_increase
+        );
     }
 
     fn get_memory_usage() -> usize {
@@ -135,6 +144,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct TrackingAllocator {
     allocated: AtomicUsize,
+}
+
+impl Default for TrackingAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TrackingAllocator {
@@ -208,12 +223,18 @@ macro_rules! assert_eq_detailed {
 macro_rules! assert_error_contains {
     ($result:expr, $expected_msg:expr) => {
         match $result {
-            Ok(val) => panic!("Expected error containing '{}', but got Ok({:?})", $expected_msg, val),
+            Ok(val) => panic!(
+                "Expected error containing '{}', but got Ok({:?})",
+                $expected_msg, val
+            ),
             Err(err) => {
                 let error_msg = format!("{}", err);
-                assert!(error_msg.contains($expected_msg), 
-                        "Error message '{}' does not contain expected text '{}'", 
-                        error_msg, $expected_msg);
+                assert!(
+                    error_msg.contains($expected_msg),
+                    "Error message '{}' does not contain expected text '{}'",
+                    error_msg,
+                    $expected_msg
+                );
             }
         }
     };
@@ -225,9 +246,12 @@ macro_rules! assert_performance {
         let start = std::time::Instant::now();
         let _result = $operation;
         let duration = start.elapsed();
-        assert!(duration <= $max_duration,
-                "Performance assertion failed: operation took {:?}, expected maximum {:?}",
-                duration, $max_duration);
+        assert!(
+            duration <= $max_duration,
+            "Performance assertion failed: operation took {:?}, expected maximum {:?}",
+            duration,
+            $max_duration
+        );
     };
 }
 
@@ -253,31 +277,31 @@ impl StrictTestRunner {
     }
 
     pub fn run_test<F>(&self, test_name: &str, test_fn: F)
-    where 
+    where
         F: FnOnce(&AssertionTracker, &PerformanceTracker),
     {
-        println!("Running strict test: {}", test_name);
-        
+        println!("Running strict test: {test_name}");
+
         test_fn(&self.assertion_tracker, &self.performance_tracker);
-        
+
         // Check for memory leaks if tracking is enabled
         if let Some(ref tracker) = self.memory_tracker {
             tracker.assert_no_memory_leak();
         }
-        
-        println!("✓ Test '{}' passed all strict checks", test_name);
+
+        println!("✓ Test '{test_name}' passed all strict checks");
     }
 
     pub fn finalize_testing(&self) {
         println!("\n=== STRICT TESTING REPORT ===");
-        
+
         // Assertion coverage report
         let assertion_report = self.assertion_tracker.get_coverage_report();
         println!("Assertion Coverage:");
         for (name, count) in assertion_report {
-            println!("  {} : {} calls", name, count);
+            println!("  {name} : {count} calls");
         }
-        
+
         // Performance report
         let perf_report = self.performance_tracker.get_benchmark_report();
         println!("\nPerformance Report:");
@@ -285,9 +309,9 @@ impl StrictTestRunner {
             let avg = durations.iter().sum::<Duration>() / durations.len() as u32;
             let min = durations.iter().min().unwrap();
             let max = durations.iter().max().unwrap();
-            println!("  {} : avg={:?}, min={:?}, max={:?}", name, avg, min, max);
+            println!("  {name} : avg={avg:?}, min={min:?}, max={max:?}");
         }
-        
+
         println!("=== END STRICT TESTING REPORT ===\n");
     }
 }
@@ -301,33 +325,33 @@ impl Default for StrictTestRunner {
 // Property-based testing utilities
 pub mod property_testing {
     use proptest::prelude::*;
-    use proptest::test_runner::{Config, TestRunner, TestError};
-    
+    use proptest::test_runner::{Config, TestError, TestRunner};
+
     /// Generate valid semantic version strings
     pub fn arb_semver() -> impl Strategy<Value = String> {
         (0u32..1000, 0u32..1000, 0u32..1000)
-            .prop_map(|(major, minor, patch)| format!("{}.{}.{}", major, minor, patch))
+            .prop_map(|(major, minor, patch)| format!("{major}.{minor}.{patch}"))
     }
-    
+
     /// Generate valid package names
     pub fn arb_package_name() -> impl Strategy<Value = String> {
         ("[a-z][a-z0-9-]*", "/", "[a-z][a-z0-9-]*")
-            .prop_map(|(vendor, sep, package)| format!("{}{}{}", vendor, sep, package))
+            .prop_map(|(vendor, sep, package)| format!("{vendor}{sep}{package}"))
     }
-    
+
     /// Generate valid version constraints
     pub fn arb_version_constraint() -> impl Strategy<Value = String> {
         prop_oneof![
             arb_semver(),
-            arb_semver().prop_map(|v| format!("^{}", v)),
-            arb_semver().prop_map(|v| format!("~{}", v)),
-            arb_semver().prop_map(|v| format!(">={}", v)),
-            arb_semver().prop_map(|v| format!(">{}", v)),
-            arb_semver().prop_map(|v| format!("<={}", v)),
-            arb_semver().prop_map(|v| format!("<{}", v)),
+            arb_semver().prop_map(|v| format!("^{v}")),
+            arb_semver().prop_map(|v| format!("~{v}")),
+            arb_semver().prop_map(|v| format!(">={v}")),
+            arb_semver().prop_map(|v| format!(">{v}")),
+            arb_semver().prop_map(|v| format!("<={v}")),
+            arb_semver().prop_map(|v| format!("<{v}")),
         ]
     }
-    
+
     /// Run property-based test with strict configuration
     pub fn run_property_test<F>(test_fn: F) -> Result<(), TestError<String>>
     where
@@ -336,9 +360,9 @@ pub mod property_testing {
         let config = Config {
             cases: 10000, // Very high number of test cases for strictness
             max_shrink_iters: 10000,
-            .. Config::default()
+            ..Config::default()
         };
-        
+
         let mut runner = TestRunner::new(config);
         runner.run(&arb_semver(), |version| {
             prop_assert!(test_fn(&version));
@@ -350,41 +374,41 @@ pub mod property_testing {
 #[cfg(test)]
 mod strict_test_utils_tests {
     use super::*;
-    
+
     #[test]
     fn test_assertion_tracker() {
         let tracker = AssertionTracker::new();
         tracker.track_assertion("test_assertion");
         tracker.track_assertion("test_assertion");
         tracker.track_assertion("another_assertion");
-        
+
         let report = tracker.get_coverage_report();
         assert_eq!(report.get("test_assertion"), Some(&2));
         assert_eq!(report.get("another_assertion"), Some(&1));
-        
+
         tracker.assert_minimum_calls("test_assertion", 2);
     }
-    
+
     #[test]
     fn test_performance_tracker() {
         let tracker = PerformanceTracker::new();
-        
+
         tracker.time_operation("fast_op", || {
             std::thread::sleep(Duration::from_millis(1));
         });
-        
+
         tracker.assert_performance_regression("fast_op", Duration::from_millis(100));
     }
-    
+
     #[test]
     #[should_panic(expected = "Performance regression detected")]
     fn test_performance_regression_detection() {
         let tracker = PerformanceTracker::new();
-        
+
         tracker.time_operation("slow_op", || {
             std::thread::sleep(Duration::from_millis(10));
         });
-        
+
         tracker.assert_performance_regression("slow_op", Duration::from_millis(5));
     }
 }

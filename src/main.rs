@@ -30,176 +30,176 @@ async fn main() -> Result<()> {
     // Execute the requested command
     match cli.command {
         Some(command) => match command {
-        Commands::Install(args) => {
-            if args.dry_run {
-                print_info("🔍 Dry run mode - no changes will be made");
-            }
-
-            let composer_path = working_dir.join("composer.json");
-            let composer = read_composer_json(&composer_path)?;
-
-            if !args.dry_run {
-                let lock = solve(&composer).await?;
-                let lock_path = working_dir.join("composer.lock");
-                write_lock(&lock_path, &lock)?;
-                install_packages(&lock.packages, working_dir).await?;
-            } else {
-                print_success("✅ Dry run completed - dependencies would be installed");
-            }
-        }
-
-        Commands::Update(args) => {
-            if args.dry_run {
-                print_info("🔍 Dry run mode - no changes will be made");
-            }
-
-            let composer_path = working_dir.join("composer.json");
-            let composer = read_composer_json(&composer_path)?;
-
-            if !args.dry_run {
-                let lock = solve(&composer).await?;
-                let lock_path = working_dir.join("composer.lock");
-                write_lock(&lock_path, &lock)?;
-                install_packages(&lock.packages, working_dir).await?;
-            } else {
-                print_success("✅ Dry run completed - dependencies would be updated");
-            }
-        }
-
-        Commands::Require(args) => {
-            if args.dry_run {
-                print_info("🔍 Dry run mode - no changes will be made");
-            }
-
-            let composer_path = working_dir.join("composer.json");
-            let mut composer = read_composer_json(&composer_path)?;
-
-            // Add packages to composer.json
-            for package_spec in &args.packages {
-                let (name, constraint) = if let Some(pos) = package_spec.find(':') {
-                    (
-                        package_spec[..pos].to_string(),
-                        package_spec[pos + 1..].to_string(),
-                    )
-                } else {
-                    (package_spec.clone(), "*".to_string())
-                };
-
-                if args.dev {
-                    composer.require_dev.insert(name, constraint);
-                } else {
-                    composer.require.insert(name, constraint);
+            Commands::Install(args) => {
+                if args.dry_run {
+                    print_info("🔍 Dry run mode - no changes will be made");
                 }
-            }
 
-            if !args.dry_run {
-                // Write updated composer.json
-                let composer_json = serde_json::to_string_pretty(&composer)?;
-                std::fs::write(&composer_path, composer_json)?;
+                let composer_path = working_dir.join("composer.json");
+                let composer = read_composer_json(&composer_path)?;
 
-                if !args.no_update {
+                if !args.dry_run {
                     let lock = solve(&composer).await?;
                     let lock_path = working_dir.join("composer.lock");
                     write_lock(&lock_path, &lock)?;
                     install_packages(&lock.packages, working_dir).await?;
-                }
-            } else {
-                print_success("✅ Dry run completed - packages would be added");
-            }
-        }
-
-        Commands::Remove(args) => {
-            if args.dry_run {
-                print_info("🔍 Dry run mode - no changes will be made");
-            }
-
-            let composer_path = working_dir.join("composer.json");
-            let mut composer = read_composer_json(&composer_path)?;
-
-            // Remove packages from composer.json
-            for package_name in &args.packages {
-                if args.dev {
-                    composer.require_dev.remove(package_name);
                 } else {
-                    composer.require.remove(package_name);
+                    print_success("✅ Dry run completed - dependencies would be installed");
                 }
             }
 
-            if !args.dry_run {
-                // Write updated composer.json
-                let composer_json = serde_json::to_string_pretty(&composer)?;
-                std::fs::write(&composer_path, composer_json)?;
+            Commands::Update(args) => {
+                if args.dry_run {
+                    print_info("🔍 Dry run mode - no changes will be made");
+                }
 
-                if !args.no_update {
+                let composer_path = working_dir.join("composer.json");
+                let composer = read_composer_json(&composer_path)?;
+
+                if !args.dry_run {
                     let lock = solve(&composer).await?;
                     let lock_path = working_dir.join("composer.lock");
                     write_lock(&lock_path, &lock)?;
                     install_packages(&lock.packages, working_dir).await?;
+                } else {
+                    print_success("✅ Dry run completed - dependencies would be updated");
                 }
-            } else {
-                print_success("✅ Dry run completed - packages would be removed");
             }
-        }
 
-        Commands::Show(args) => {
-            if let Some(package) = &args.package {
-                show_package_details(package, working_dir).await?;
-            } else {
+            Commands::Require(args) => {
+                if args.dry_run {
+                    print_info("🔍 Dry run mode - no changes will be made");
+                }
+
+                let composer_path = working_dir.join("composer.json");
+                let mut composer = read_composer_json(&composer_path)?;
+
+                // Add packages to composer.json
+                for package_spec in &args.packages {
+                    let (name, constraint) = if let Some(pos) = package_spec.find(':') {
+                        (
+                            package_spec[..pos].to_string(),
+                            package_spec[pos + 1..].to_string(),
+                        )
+                    } else {
+                        (package_spec.clone(), "*".to_string())
+                    };
+
+                    if args.dev {
+                        composer.require_dev.insert(name, constraint);
+                    } else {
+                        composer.require.insert(name, constraint);
+                    }
+                }
+
+                if !args.dry_run {
+                    // Write updated composer.json
+                    let composer_json = serde_json::to_string_pretty(&composer)?;
+                    std::fs::write(&composer_path, composer_json)?;
+
+                    if !args.no_update {
+                        let lock = solve(&composer).await?;
+                        let lock_path = working_dir.join("composer.lock");
+                        write_lock(&lock_path, &lock)?;
+                        install_packages(&lock.packages, working_dir).await?;
+                    }
+                } else {
+                    print_success("✅ Dry run completed - packages would be added");
+                }
+            }
+
+            Commands::Remove(args) => {
+                if args.dry_run {
+                    print_info("🔍 Dry run mode - no changes will be made");
+                }
+
+                let composer_path = working_dir.join("composer.json");
+                let mut composer = read_composer_json(&composer_path)?;
+
+                // Remove packages from composer.json
+                for package_name in &args.packages {
+                    if args.dev {
+                        composer.require_dev.remove(package_name);
+                    } else {
+                        composer.require.remove(package_name);
+                    }
+                }
+
+                if !args.dry_run {
+                    // Write updated composer.json
+                    let composer_json = serde_json::to_string_pretty(&composer)?;
+                    std::fs::write(&composer_path, composer_json)?;
+
+                    if !args.no_update {
+                        let lock = solve(&composer).await?;
+                        let lock_path = working_dir.join("composer.lock");
+                        write_lock(&lock_path, &lock)?;
+                        install_packages(&lock.packages, working_dir).await?;
+                    }
+                } else {
+                    print_success("✅ Dry run completed - packages would be removed");
+                }
+            }
+
+            Commands::Show(args) => {
+                if let Some(package) = &args.package {
+                    show_package_details(package, working_dir).await?;
+                } else {
+                    show_dependency_status(working_dir).await?;
+                }
+            }
+
+            Commands::Autoload(_args) => {
+                let composer_path = working_dir.join("composer.json");
+                let composer = read_composer_json(&composer_path)?;
+
+                // Read the lock file to get installed packages
+                let lock_path = working_dir.join("composer.lock");
+                if !lock_path.exists() {
+                    print_error("❌ No composer.lock found. Run 'lectern install' first.");
+                    return Ok(());
+                }
+
+                let lock = read_lock(&lock_path)?;
+
+                // Convert LockedPackage to InstalledPackage for autoload generation
+                let installed: Vec<InstalledPackage> = lock
+                    .packages
+                    .iter()
+                    .map(|pkg| InstalledPackage {
+                        name: pkg.name.clone(),
+                        version: pkg.version.clone(),
+                        path: format!("vendor/{}", pkg.name).into(),
+                    })
+                    .collect();
+
+                write_autoload_files(working_dir, &composer, &installed).await?;
+            }
+
+            Commands::Search(args) => {
+                search_packages(&args.terms, working_dir).await?;
+            }
+
+            Commands::Init(args) => {
+                init_project(working_dir, &args)?;
+            }
+
+            Commands::Outdated => {
+                check_outdated_packages(working_dir, cli.quiet).await?;
+            }
+
+            Commands::Status => {
                 show_dependency_status(working_dir).await?;
             }
-        }
 
-        Commands::Autoload(_args) => {
-            let composer_path = working_dir.join("composer.json");
-            let composer = read_composer_json(&composer_path)?;
-
-            // Read the lock file to get installed packages
-            let lock_path = working_dir.join("composer.lock");
-            if !lock_path.exists() {
-                print_error("❌ No composer.lock found. Run 'lectern install' first.");
-                return Ok(());
+            Commands::Licenses => {
+                show_dependency_licenses(working_dir, cli.quiet).await?;
             }
 
-            let lock = read_lock(&lock_path)?;
-
-            // Convert LockedPackage to InstalledPackage for autoload generation
-            let installed: Vec<InstalledPackage> = lock
-                .packages
-                .iter()
-                .map(|pkg| InstalledPackage {
-                    name: pkg.name.clone(),
-                    version: pkg.version.clone(),
-                    path: format!("vendor/{}", pkg.name).into(),
-                })
-                .collect();
-
-            write_autoload_files(working_dir, &composer, &installed).await?;
-        }
-
-        Commands::Search(args) => {
-            search_packages(&args.terms, working_dir).await?;
-        }
-
-        Commands::Init(args) => {
-            init_project(working_dir, &args)?;
-        }
-
-        Commands::Outdated => {
-            check_outdated_packages(working_dir, cli.quiet).await?;
-        }
-
-        Commands::Status => {
-            show_dependency_status(working_dir).await?;
-        }
-
-        Commands::Licenses => {
-            show_dependency_licenses(working_dir, cli.quiet).await?;
-        }
-
-        Commands::Validate(args) => {
-            validate_composer_json(working_dir, &args)?;
-        }
-        }
+            Commands::Validate(args) => {
+                validate_composer_json(working_dir, &args)?;
+            }
+        },
         None => {
             // No command provided, show help
             use clap::CommandFactory;

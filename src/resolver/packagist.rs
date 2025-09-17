@@ -145,7 +145,7 @@ pub async fn fetch_packagist_versions_cached(client: &Client, pkg: &str) -> Resu
     let url = format!("https://repo.packagist.org/p2/{pkg}.json");
     let resp = client
         .get(&url)
-        .timeout(std::time::Duration::from_secs(30))  // Add timeout
+        .timeout(std::time::Duration::from_secs(30)) // Add timeout
         .send()
         .await
         .context("packagist request")?
@@ -171,15 +171,18 @@ pub async fn fetch_packagist_versions_cached(client: &Client, pkg: &str) -> Resu
 }
 
 /// Fetch multiple packages concurrently for better performance
-pub async fn fetch_packagist_versions_bulk(client: &Client, packages: &[String]) -> Result<BTreeMap<String, Vec<P2Version>>> {
+pub async fn fetch_packagist_versions_bulk(
+    client: &Client,
+    packages: &[String],
+) -> Result<BTreeMap<String, Vec<P2Version>>> {
     let mut results = BTreeMap::new();
-    
+
     // First check cache for all packages
     let cache_keys: Vec<String> = packages.iter().map(|pkg| format!("p2:{pkg}")).collect();
     let cached_results = cache::cache_get_multiple_package_info(&cache_keys).await;
-    
+
     let mut packages_to_fetch = Vec::new();
-    
+
     for pkg in packages {
         let cache_key = format!("p2:{pkg}");
         if let Some(cached) = cached_results.get(&cache_key) {
@@ -190,14 +193,14 @@ pub async fn fetch_packagist_versions_bulk(client: &Client, packages: &[String])
         }
         packages_to_fetch.push(pkg.clone());
     }
-    
+
     if packages_to_fetch.is_empty() {
         return Ok(results);
     }
-    
+
     // Fetch uncached packages concurrently
     let mut futures = FuturesUnordered::new();
-    
+
     for pkg in packages_to_fetch {
         let client = client.clone();
         futures.push(async move {
@@ -207,13 +210,13 @@ pub async fn fetch_packagist_versions_bulk(client: &Client, packages: &[String])
             }
         });
     }
-    
+
     while let Some(result) = futures.next().await {
         if let Some((pkg, versions)) = result {
             results.insert(pkg, versions);
         }
     }
-    
+
     Ok(results)
 }
 
@@ -321,18 +324,22 @@ pub async fn fetch_multiple_package_info(
 
     let mut futures = FuturesUnordered::new();
 
-    for package_name in &missing_packages {
-        let name = package_name.clone();
+    for chunk in missing_packages.chunks(10) {
+        let chunk = chunk.to_vec();
         futures.push(async move {
-            match fetch_package_info(&name).await {
-                Ok(info) => (name, Some(info)),
-                Err(_) => (name, None),
+            let mut results = Vec::new();
+            for package_name in chunk {
+                match fetch_package_info(&package_name).await {
+                    Ok(info) => results.push((package_name, Some(info))),
+                    Err(_) => results.push((package_name, None)),
+                }
             }
+            results
         });
     }
 
-    while let Some(result) = futures.next().await {
-        final_results.push(result);
+    while let Some(results) = futures.next().await {
+        final_results.extend(results);
     }
 
     // Cache the new results

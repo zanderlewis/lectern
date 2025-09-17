@@ -1,15 +1,16 @@
-use crate::model::{ComposerJson, LockedPackage, SourceInfo, DistInfo};
+use crate::model::{ComposerJson, DistInfo, LockedPackage, SourceInfo};
 use crate::resolver::packagist::{
-    P2Version, fetch_packagist_versions_cached, fetch_packagist_versions_bulk, is_platform_dependency,
+    P2Version, fetch_packagist_versions_bulk, fetch_packagist_versions_cached,
+    is_platform_dependency,
 };
 use crate::resolver::version::parse_constraint;
 use crate::utils::{print_error, print_info, print_step, print_success, print_warning};
 use anyhow::{Context, Result, anyhow};
 use reqwest::Client;
 use semver::{Version, VersionReq};
-use std::collections::{BTreeSet, VecDeque, BTreeMap};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
-use sha2::{Sha256, Digest};
 
 /// Main dependency resolution function with batch processing optimization
 pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
@@ -23,7 +24,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
 
     // Collect all dependencies first for batch processing
     let mut all_deps = Vec::new();
-    
+
     // Add all direct dependencies to the queue
     for (name, constraint) in &composer.require {
         // Skip platform dependencies
@@ -48,8 +49,13 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
 
     // Pre-fetch all direct dependencies in bulk for better performance
     if !all_deps.is_empty() {
-        print_info(&format!("📥 Pre-fetching {} dependencies in batch...", all_deps.len()));
-        let _bulk_versions = fetch_packagist_versions_bulk(&client, &all_deps).await.unwrap_or_default();
+        print_info(&format!(
+            "📥 Pre-fetching {} dependencies in batch...",
+            all_deps.len()
+        ));
+        let _bulk_versions = fetch_packagist_versions_bulk(&client, &all_deps)
+            .await
+            .unwrap_or_default();
         print_success("✅ Batch pre-fetch completed");
     }
 
@@ -130,14 +136,18 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
                 print_error(&format!(
                     "❌ No version satisfies constraint '{constraint_str}' for package {pkg_name}: {e}"
                 ));
-                print_info(&format!("Available versions for {pkg_name}: {}", 
-                    versions.iter()
+                print_info(&format!(
+                    "Available versions for {pkg_name}: {}",
+                    versions
+                        .iter()
                         .take(5)
                         .map(|v| v.version.clone())
                         .collect::<Vec<_>>()
                         .join(", ")
                 ));
-                return Err(anyhow!("No version satisfies constraint '{constraint_str}' for package {pkg_name}"));
+                return Err(anyhow!(
+                    "No version satisfies constraint '{constraint_str}' for package {pkg_name}"
+                ));
             }
         };
 
@@ -156,44 +166,80 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
                 shasum: d.shasum.clone().unwrap_or_default(),
             }),
             require: best_version.require.clone(),
-            require_dev: best_version.other.get("require-dev")
+            require_dev: best_version
+                .other
+                .get("require-dev")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            conflict: best_version.other.get("conflict")
+            conflict: best_version
+                .other
+                .get("conflict")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            replace: best_version.other.get("replace")
+            replace: best_version
+                .other
+                .get("replace")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            provide: best_version.other.get("provide")
+            provide: best_version
+                .other
+                .get("provide")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            suggest: best_version.other.get("suggest")
+            suggest: best_version
+                .other
+                .get("suggest")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            package_type: best_version.other.get("type")
+            package_type: best_version
+                .other
+                .get("type")
                 .and_then(|v| v.as_str().map(|s| s.to_string()))
                 .or_else(|| Some("library".to_string())),
             extra: best_version.extra.clone(),
-            autoload: best_version.other.get("autoload")
+            autoload: best_version
+                .other
+                .get("autoload")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            autoload_dev: best_version.other.get("autoload-dev")
+            autoload_dev: best_version
+                .other
+                .get("autoload-dev")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
             notification_url: Some("https://packagist.org/downloads/".to_string()),
-            license: best_version.other.get("license")
+            license: best_version
+                .other
+                .get("license")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            authors: best_version.other.get("authors")
+            authors: best_version
+                .other
+                .get("authors")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            description: best_version.other.get("description")
+            description: best_version
+                .other
+                .get("description")
                 .and_then(|v| v.as_str().map(|s| s.to_string())),
-            homepage: best_version.other.get("homepage")
+            homepage: best_version
+                .other
+                .get("homepage")
                 .and_then(|v| v.as_str().map(|s| s.to_string())),
-            keywords: best_version.other.get("keywords")
+            keywords: best_version
+                .other
+                .get("keywords")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            support: best_version.other.get("support")
+            support: best_version
+                .other
+                .get("support")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            funding: best_version.other.get("funding")
+            funding: best_version
+                .other
+                .get("funding")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            time: best_version.other.get("time")
+            time: best_version
+                .other
+                .get("time")
                 .and_then(|v| v.as_str().map(|s| s.to_string())),
-            bin: best_version.other.get("bin")
+            bin: best_version
+                .other
+                .get("bin")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
-            include_path: best_version.other.get("include-path")
+            include_path: best_version
+                .other
+                .get("include-path")
                 .and_then(|v| serde_json::from_value(v.clone()).ok()),
         };
 
@@ -219,17 +265,20 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::model::Lock> {
 
     // Sort packages by name for consistent output
     locked_packages.sort_by(|a, b| a.name.cmp(&b.name));
-    
+
     // Separate dev and regular packages
     let (dev_packages, regular_packages): (Vec<_>, Vec<_>) = locked_packages
         .into_iter()
         .partition(|pkg| dev_package_names.contains(&pkg.name));
 
-    print_success(&format!("✅ Resolved {} packages", regular_packages.len() + dev_packages.len()));
+    print_success(&format!(
+        "✅ Resolved {} packages",
+        regular_packages.len() + dev_packages.len()
+    ));
 
     // Generate content hash for the lock file
     let content_hash = generate_content_hash_from_composer(composer);
-    
+
     Ok(crate::model::Lock {
         _readme: vec![
             "This file locks the dependencies of your project to a known state".to_string(),
@@ -261,12 +310,12 @@ pub fn generate_content_hash(content: &str) -> String {
 /// Generate content hash from ComposerJson structure
 fn generate_content_hash_from_composer(composer: &ComposerJson) -> String {
     let mut hasher = Sha256::new();
-    
+
     // Create a normalized representation for hashing
     let mut content = String::new();
     content.push_str(&serde_json::to_string(&composer.require).unwrap_or_default());
     content.push_str(&serde_json::to_string(&composer.require_dev).unwrap_or_default());
-    
+
     hasher.update(content.as_bytes());
     let result = hasher.finalize();
     hex::encode(result)
@@ -288,8 +337,10 @@ pub fn find_best_version<'a>(
         };
 
         // Handle development versions more broadly
-        if version_string.contains("dev") || version_string.starts_with("dev-") 
-           || version_string.ends_with("-dev") {
+        if version_string.contains("dev")
+            || version_string.starts_with("dev-")
+            || version_string.ends_with("-dev")
+        {
             // For dev versions, we'll be more lenient
             if constraint == &VersionReq::STAR {
                 candidates.push((version, Version::parse("999.0.0-dev").unwrap()));
@@ -326,7 +377,8 @@ pub fn find_best_version<'a>(
         return Err(anyhow!(
             "No version satisfies constraint. Constraint: {}, Available versions: [{}]",
             constraint,
-            versions.iter()
+            versions
+                .iter()
                 .take(10)
                 .map(|v| v.version.clone())
                 .collect::<Vec<_>>()
@@ -343,17 +395,20 @@ pub fn find_best_version<'a>(
 /// Try alternative normalization strategies for version strings
 fn try_alternative_normalization(version: &str) -> Result<String> {
     let version = version.trim();
-    
+
     // Handle versions with only major.minor (add .0)
     if version.matches('.').count() == 1 && !version.contains('-') {
         return Ok(format!("{version}.0"));
     }
-    
+
     // Handle versions with only major (add .0.0)
-    if !version.contains('.') && !version.contains('-') && version.chars().all(|c| c.is_ascii_digit()) {
+    if !version.contains('.')
+        && !version.contains('-')
+        && version.chars().all(|c| c.is_ascii_digit())
+    {
         return Ok(format!("{version}.0.0"));
     }
-    
+
     // Handle versions like "1.0.x" or "1.x"
     if version.contains('x') {
         let normalized = version.replace('x', "0");
@@ -361,7 +416,7 @@ fn try_alternative_normalization(version: &str) -> Result<String> {
             return Ok(parts);
         }
     }
-    
+
     Err(anyhow!("Could not normalize version: {}", version))
 }
 
