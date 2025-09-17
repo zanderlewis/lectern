@@ -2,7 +2,9 @@
 Lectern is an async and concurrent rewrite of PHP's Composer package manager in Rust. Built with lots of help from ChatGPT-5 and Claude Sonnet 4.
 
 ## Todo
-Lectern is not a complete replacement for Composer just yet! Some things I haven't been able to test (as AI wrote that code), or aren't of high priority.
+Lectern is not a complete replacement for Composer just yet!
+Some things I haven't been able to test (as AI wrote that code),
+or aren't of high priority.
 - Composer compatible plugin system
 - Testing of private packages and git repositories
 - Implement the rest of Composer's commands
