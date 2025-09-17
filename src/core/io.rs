@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+use crate::core::cache_utils::get_cache_dir;
 use serde_json;
 
 // Composer JSON support
@@ -46,9 +47,9 @@ pub fn write_lock(path: &Path, lock: &Lock) -> Result<()> {
 
 /// Write cache data to a file
 pub fn write_cache(path: &Path, cache: &HashMap<String, String>) -> Result<()> {
-    let cache_dir = Path::new(".lectern_cache");
+    let cache_dir = get_cache_dir();
     if !cache_dir.exists() {
-        fs::create_dir_all(cache_dir)?;
+        fs::create_dir_all(&cache_dir)?;
     }
     let cache_path = cache_dir.join(path);
     let s = serde_json::to_string_pretty(cache)?;
@@ -59,7 +60,7 @@ pub fn write_cache(path: &Path, cache: &HashMap<String, String>) -> Result<()> {
 
 /// Read cache data from a file
 pub fn read_cache(path: &Path) -> Result<HashMap<String, String>> {
-    let cache_dir = Path::new(".lectern_cache");
+    let cache_dir = get_cache_dir();
     let cache_path = cache_dir.join(path);
     if cache_path.exists() {
         let s = fs::read_to_string(&cache_path).with_context(|| format!("read {cache_path:?}"))?;

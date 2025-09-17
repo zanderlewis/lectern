@@ -2,12 +2,10 @@ use anyhow::Result;
 use sha2::Digest;
 use std::path::{Path, PathBuf};
 use tokio::task;
+use crate::core::cache_utils::get_cache_dir;
 
 pub fn get_package_cache_dir() -> PathBuf {
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(".lectern_cache")
-        .join("packages")
+    get_cache_dir().join("packages")
 }
 
 pub fn get_cached_package_path(name: &str, version: &str, url: &str) -> PathBuf {

@@ -1,5 +1,5 @@
 # Lectern specific
-.lectern_cache/
+# Cache is stored under the user's XDG cache dir (e.g. $XDG_CACHE_HOME/lectern or ~/.cache/lectern)
 
 # Cargo specific
 target/

@@ -41,8 +41,8 @@ Please note that performance is tested when both Composer and Lectern have warm 
 
 ## Technical Architecture
 
-### Caching System
-- **Multi-layered caching**: Filesystem-based persistent cache in `.lectern_cache/`
+-### Caching System
+- **Multi-layered caching**: Filesystem-based persistent cache in `$XDG_CACHE_HOME/lectern` (or `~/.cache/lectern`)
 - **Cache structure**: SHA-256 hashed keys for efficient storage
 - **Specialized caches**: 
   - Package metadata cache

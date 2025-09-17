@@ -19,6 +19,11 @@ Check out the full [Lectern v. Composer Benchmark Report](https://github.com/zan
 
 ## Commands
 
+## Cache location
+
+- Lectern uses a global user cache directory by default. It will use `$XDG_CACHE_HOME/lectern` when the XDG environment is set, otherwise `~/.cache/lectern`.
+- To clear the cache manually, remove that directory (for example `rm -rf ~/.cache/lectern`).
+
 ### `lectern install`
 Installs the dependencies listed in the `composer.json` file. Equivalent to `composer install`.
 

@@ -38,10 +38,24 @@ pub fn hash_key(key: &str) -> String {
 }
 
 pub fn get_cache_dir() -> PathBuf {
+    // Prefer XDG_CACHE_HOME if set, otherwise fall back to ~/.cache/lectern
+    if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
+        return PathBuf::from(xdg).join("lectern");
+    }
+
+    if let Some(home) = dirs::home_dir() {
+        return home.join(".cache").join("lectern");
+    }
+
+    // Fallback to current dir if we couldn't determine a home directory
     std::env::current_dir()
         .unwrap_or_else(|_| PathBuf::from("."))
         .join(".lectern_cache")
 }
+
+// Note: The cache is now global per user. It lives under `$XDG_CACHE_HOME/lectern` when
+// available, otherwise `~/.cache/lectern`. This keeps cache data shared across projects
+// and avoids creating per-project `.lectern_cache` directories.
 
 pub fn get_cache_file_path(cache_type: &str, key: &str) -> PathBuf {
     let cache_dir = get_cache_dir().join(cache_type);
