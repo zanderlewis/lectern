@@ -15,3 +15,6 @@ Thumbs.db
 # IDE specific
 .idea/
 .vscode/
+
+# Codesnap
+image.png
