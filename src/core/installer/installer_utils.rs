@@ -1,8 +1,8 @@
+use crate::core::cache_utils::get_cache_dir;
 use anyhow::Result;
 use sha2::Digest;
 use std::path::{Path, PathBuf};
 use tokio::task;
-use crate::core::cache_utils::get_cache_dir;
 
 pub fn get_package_cache_dir() -> PathBuf {
     get_cache_dir().join("packages")
@@ -35,7 +35,8 @@ pub fn extract_archive_ultra_fast(archive: &Path, dest: &Path) -> Result<()> {
             extract_zip_ultra_fast(archive, dest)
         }
         [0x1F, 0x8B, _, _] => extract_tar_gz_ultra_fast(archive, dest),
-        _ => extract_zip_ultra_fast(archive, dest).or_else(|_| extract_tar_gz_ultra_fast(archive, dest)),
+        _ => extract_zip_ultra_fast(archive, dest)
+            .or_else(|_| extract_tar_gz_ultra_fast(archive, dest)),
     }
 }
 
@@ -79,7 +80,7 @@ pub fn extract_zip_ultra_fast(archive: &Path, dest: &Path) -> Result<()> {
         let mut output = std::fs::File::create(&path)?;
 
         // Use large buffer for faster copying
-        let mut buffer = vec![0; 65536.max(8192)];
+        let mut buffer = vec![0; 65536];
         loop {
             let bytes_read = std::io::Read::read(&mut entry, &mut buffer)?;
             if bytes_read == 0 {

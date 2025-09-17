@@ -1,11 +1,11 @@
 use anyhow::Result;
+use futures::StreamExt;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Semaphore;
 use tokio::task;
-use futures::StreamExt;
 
 use crate::core::installer::installer_utils as inst_utils;
 
@@ -103,8 +103,10 @@ pub async fn download_and_extract_streaming(
     let target = target.to_path_buf();
     let cache_path_clone = cache_path.clone();
 
-    task::spawn_blocking(move || -> Result<()> { inst_utils::extract_archive_ultra_fast(&cache_path_clone, &target) })
-        .await??;
+    task::spawn_blocking(move || -> Result<()> {
+        inst_utils::extract_archive_ultra_fast(&cache_path_clone, &target)
+    })
+    .await??;
 
     Ok(())
 }

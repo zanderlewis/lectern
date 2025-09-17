@@ -1,5 +1,6 @@
-use crate::io::{read_lock, write_cache, read_cache};
+use crate::io::{read_cache, read_lock, write_cache};
 use crate::resolver::{fetch_package_info, search_packagist};
+use crate::utils::is_prerelease_version;
 use crate::utils::{print_error, print_info, print_success};
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
@@ -7,7 +8,6 @@ use semver::Version;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use crate::utils::is_prerelease_version;
 
 /// Check for outdated packages with incremental updates
 /// # Errors
@@ -42,7 +42,7 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
     // Load cached state
     let cache_path = Path::new("cache.json");
     let mut cached_versions: HashMap<String, String> = if cache_path.exists() {
-        read_cache(&cache_path).unwrap_or_default()
+        read_cache(cache_path).unwrap_or_default()
     } else {
         HashMap::new()
     };
@@ -77,7 +77,10 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
         .for_each(|_| async {})
         .await;
 
-    let package_info_map = Arc::try_unwrap(package_info_map).unwrap().into_inner().unwrap();
+    let package_info_map = Arc::try_unwrap(package_info_map)
+        .unwrap()
+        .into_inner()
+        .unwrap();
 
     let mut outdated_count = 0;
     let mut table_rows = Vec::new();
@@ -144,14 +147,14 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
             cached_versions.insert(package_name, locked_pkg.version.clone());
         }
     }
-    write_cache(&cache_path, &cached_versions)?;
+    write_cache(cache_path, &cached_versions)?;
 
     if outdated_count == 0 {
         if !quiet {
             print_success("✅ All packages are up to date!");
         }
     } else if !quiet {
-        println!("\n📊 Outdated Packages ({} found):", outdated_count);
+        println!("\n📊 Outdated Packages ({outdated_count} found):");
         println!(
             "{:<30} {:<15} {:<15} Description",
             "Package", "Current", "Latest"
@@ -164,7 +167,7 @@ pub async fn check_outdated_packages(working_dir: &Path, quiet: bool) -> Result<
             } else {
                 desc
             };
-            println!("{:<30} {:<15} {:<15} {}", name, current, latest, short_desc);
+            println!("{name:<30} {current:<15} {latest:<15} {short_desc}");
         }
 
         println!("\nRun 'lectern update' to update packages.");

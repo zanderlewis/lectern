@@ -1,11 +1,11 @@
+use crate::core::cache_utils::get_cache_dir;
 use crate::models::model::{ComposerJson, Lock};
 use anyhow::{Context, Result};
+use serde_json;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use crate::core::cache_utils::get_cache_dir;
-use serde_json;
 
 // Composer JSON support
 pub fn read_composer_json(path: &Path) -> Result<ComposerJson> {
@@ -64,7 +64,8 @@ pub fn read_cache(path: &Path) -> Result<HashMap<String, String>> {
     let cache_path = cache_dir.join(path);
     if cache_path.exists() {
         let s = fs::read_to_string(&cache_path).with_context(|| format!("read {cache_path:?}"))?;
-        let cache: HashMap<String, String> = serde_json::from_str(&s).context("parse cache file")?;
+        let cache: HashMap<String, String> =
+            serde_json::from_str(&s).context("parse cache file")?;
         Ok(cache)
     } else {
         Ok(HashMap::new())

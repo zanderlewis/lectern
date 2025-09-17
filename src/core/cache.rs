@@ -24,7 +24,7 @@ static MEMORY_CACHE: MemoryCacheType = LazyLock::new(|| {
     )))
 });
 
-use crate::core::cache_utils::{get_cache_dir, get_cache_file_path, CacheEntry};
+use crate::core::cache_utils::{CacheEntry, get_cache_dir, get_cache_file_path};
 
 async fn load_from_cache(cache_type: &str, key: &str) -> Option<JsonValue> {
     let cache_key = format!("{cache_type}:{key}");

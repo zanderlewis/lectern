@@ -1,9 +1,11 @@
 use crate::models::model::{ComposerJson, DistInfo, LockedPackage, SourceInfo};
-use crate::resolver::packagist::{fetch_packagist_versions_bulk, fetch_packagist_versions_cached, is_platform_dependency};
-use crate::resolver::version::parse_constraint;
 use crate::resolver::dependency_utils as utils_dep;
+use crate::resolver::dependency_utils::read_package_from_path;
 pub use crate::resolver::dependency_utils::{find_best_version, generate_content_hash};
-use crate::resolver::dependency_utils::{read_package_from_path};
+use crate::resolver::packagist::{
+    fetch_packagist_versions_bulk, fetch_packagist_versions_cached, is_platform_dependency,
+};
+use crate::resolver::version::parse_constraint;
 use crate::utils::{print_error, print_info, print_step, print_success, print_warning};
 use anyhow::{Result, anyhow};
 use reqwest::Client;
@@ -305,8 +307,14 @@ mod tests {
 
     #[test]
     fn test_normalize_version_string() {
-        assert_eq!(utils_dep::normalize_version_string("1.2.3").unwrap(), "1.2.3");
-        assert_eq!(utils_dep::normalize_version_string("v1.2.3").unwrap(), "1.2.3");
+        assert_eq!(
+            utils_dep::normalize_version_string("1.2.3").unwrap(),
+            "1.2.3"
+        );
+        assert_eq!(
+            utils_dep::normalize_version_string("v1.2.3").unwrap(),
+            "1.2.3"
+        );
         assert_eq!(
             utils_dep::normalize_version_string("dev-master").unwrap(),
             "999.0.0-dev"
@@ -319,7 +327,10 @@ mod tests {
 
     #[test]
     fn test_normalize_basic_version() {
-        assert_eq!(utils_dep::normalize_basic_version("1.2.3").unwrap(), "1.2.3");
+        assert_eq!(
+            utils_dep::normalize_basic_version("1.2.3").unwrap(),
+            "1.2.3"
+        );
         assert_eq!(utils_dep::normalize_basic_version("1.2").unwrap(), "1.2.0");
         assert_eq!(utils_dep::normalize_basic_version("1").unwrap(), "1.0.0");
     }
