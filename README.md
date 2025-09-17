@@ -24,6 +24,11 @@ Check out the full [Lectern v. Composer Benchmark Report](https://github.com/zan
 - Lectern uses a global user cache directory by default. It will use `$XDG_CACHE_HOME/lectern` when the XDG environment is set, otherwise `~/.cache/lectern`.
 - To clear the cache manually, remove that directory (for example `rm -rf ~/.cache/lectern`).
 
+## Publishing (CI)
+
+- A GitHub Actions workflow has been added to publish the crate to crates.io when a GitHub release is published: `.github/workflows/publish.yml`.
+- You must add a repository secret named `CRATES_IO_TOKEN` (your crates.io API token) for publishing to work. The workflow uses this secret to run `cargo publish`.
+
 ### `lectern install`
 Installs the dependencies listed in the `composer.json` file. Equivalent to `composer install`.
 
