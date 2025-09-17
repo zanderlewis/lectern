@@ -5,6 +5,8 @@ Lectern is an async and concurrent rewrite of PHP's Composer package manager in 
 Lectern is not a complete replacement for Composer just yet! Some things I haven't been able to test (as AI wrote that code), or aren't of high priority.
 - Composer compatible plugin system
 - Testing of private packages and git repositories
+- Implement the rest of Composer's commands
+- Speed up Outdated checks, as they are slower than Composer currently
 
 ## Benchmarks
 This image is the performance comparison for Lectern and Composer cache hits on various different commands (lower is better):
@@ -17,17 +19,15 @@ This chart shows the average performance based on command category, and the exec
 
 Check out the full [Lectern v. Composer Benchmark Report](/benchmarks/performance-report.md) for detailed performance comparisons and insights.
 
-## Commands
-
 ## Cache location
-
 - Lectern uses a global user cache directory by default. It will use `$XDG_CACHE_HOME/lectern` when the XDG environment is set, otherwise `~/.cache/lectern`.
 - To clear the cache manually, remove that directory (for example `rm -rf ~/.cache/lectern`).
 
 ## Publishing (CI)
-
 - A GitHub Actions workflow has been added to publish the crate to crates.io when a GitHub release is published: `.github/workflows/publish.yml`.
 - You must add a repository secret named `CRATES_IO_TOKEN` (your crates.io API token) for publishing to work. The workflow uses this secret to run `cargo publish`.
+
+## Commands
 
 ### `lectern install`
 Installs the dependencies listed in the `composer.json` file. Equivalent to `composer install`.
