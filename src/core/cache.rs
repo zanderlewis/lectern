@@ -1,10 +1,9 @@
 use anyhow::Result;
 use lru::LruCache;
 use serde_json::Value as JsonValue;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
-use std::path::PathBuf;
+// PathBuf is available via cache_utils when needed
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::fs;
@@ -25,51 +24,7 @@ static MEMORY_CACHE: MemoryCacheType = LazyLock::new(|| {
     )))
 });
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CacheEntry {
-    data: JsonValue,
-    timestamp: u64,
-    ttl: u64,
-}
-
-impl CacheEntry {
-    fn new(data: JsonValue, ttl: Duration) -> Self {
-        Self {
-            data,
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            ttl: ttl.as_secs(),
-        }
-    }
-
-    fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        now - self.timestamp > self.ttl
-    }
-}
-
-fn get_cache_dir() -> PathBuf {
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join(".lectern_cache")
-}
-
-fn hash_key(key: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(key.as_bytes());
-    format!("{:x}", hasher.finalize())
-}
-
-fn get_cache_file_path(cache_type: &str, key: &str) -> PathBuf {
-    let cache_dir = get_cache_dir().join(cache_type);
-    let hashed_key = hash_key(key);
-    cache_dir.join(format!("{hashed_key}.json"))
-}
+use crate::core::cache_utils::{get_cache_dir, get_cache_file_path, CacheEntry};
 
 async fn load_from_cache(cache_type: &str, key: &str) -> Option<JsonValue> {
     let cache_key = format!("{cache_type}:{key}");

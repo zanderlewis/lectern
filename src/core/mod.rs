@@ -4,4 +4,5 @@ pub mod io;
 pub mod utils;
 pub mod cache;
 pub mod installer;
+pub mod cache_utils;
 pub mod commands;

@@ -1,4 +1,5 @@
 pub mod dependency;
+pub mod dependency_utils;
 pub mod packagist;
 pub mod version;
 
