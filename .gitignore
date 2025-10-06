@@ -1,12 +1,13 @@
-# Lectern specific
-# Cache is stored under the user's XDG cache dir (e.g. $XDG_CACHE_HOME/lectern or ~/.cache/lectern)
-
 # Cargo specific
 target/
 
 # Manual Tests
 test*/
 !tests/
+
+# Benchmarks
+bench-test/
+BENCHMARK.md
 
 # OS specific
 .DS_Store

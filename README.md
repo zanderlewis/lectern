@@ -18,15 +18,36 @@ or aren't of high priority.
 - Further optimize dependency resolver with constraint caching
 
 ## Benchmarks
-This image is the performance comparison for Lectern and Composer cache hits on various different commands (lower is better):
-![Performance Comparison](/benchmarks/charts/performance_comparison.png)
 
-Lectern is in orange, and clearly shows that Lectern is much faster than Composer! However, some commands are slower than Composer, but these commands are likely not used often.
+Lectern significantly outperforms Composer across all common operations. Our benchmarks use [hyperfine](https://github.com/sharkdp/hyperfine) for accurate performance measurements with automatic cache warm-up and multiple test runs.
 
-This chart shows the average performance based on command category, and the execution time between Lectern and Composer for each category.
-![Speedup Chart](/benchmarks/charts/category_performance.png)
+**Performance Highlights:**
+- 🚀 **Install**: ~21x faster
+- ⚡ **Update**: ~17x faster
+- 🔍 **Outdated**: ~152x faster
+- 📦 **Require**: ~18x faster
+- ✨ **Show**: ~24x faster
 
-Check out the full [Lectern v. Composer Benchmark Report](/benchmarks/performance-report.md) for detailed performance comparisons and insights.
+### Running Benchmarks
+
+To run the benchmarks yourself:
+
+```bash
+./bench.sh
+```
+
+This will:
+1. Build Lectern in release mode
+2. Run comprehensive benchmarks comparing Lectern vs Composer
+3. Generate a detailed report in `BENCHMARK.md`
+
+**Requirements:**
+- [hyperfine](https://github.com/sharkdp/hyperfine) - Install via `cargo install hyperfine` or your package manager
+- Composer installed and available in PATH
+
+### Detailed Results
+
+See [BENCHMARK.md](BENCHMARK.md) for the complete benchmark report with detailed timing information and statistical analysis.
 
 ## Cache location
 - Lectern uses a global user cache directory by default. It will use `$XDG_CACHE_HOME/lectern` when the XDG environment is set, otherwise `~/.cache/lectern`.
