@@ -110,8 +110,7 @@ async fn test_search_packages_integration() {
 #[tokio::test]
 async fn test_get_package_versions_integration() {
     // This is an integration test that requires network access
-    let client = reqwest::Client::new();
-    let result = fetch_packagist_versions_cached(&client, "monolog/monolog").await;
+    let result = fetch_packagist_versions_cached("monolog/monolog").await;
 
     match result {
         Ok(versions) => {

@@ -5,8 +5,9 @@ use lectern::{
     autoload::write_autoload_files,
     cli::*,
     commands::{
-        check_outdated_packages, search_packages, show_dependency_licenses, show_dependency_status,
-        show_package_details,
+        browse_package, check_outdated_packages, clear_cache, create_project, diagnose, run_script,
+        search_packages, show_dependency_licenses, show_dependency_status, show_depends,
+        show_funding, show_package_details, show_prohibits, show_suggests,
     },
     installer::{InstalledPackage, install_packages},
     io::{read_composer_json, read_lock, write_lock},
@@ -198,6 +199,77 @@ async fn main() -> Result<()> {
 
             Commands::Validate(args) => {
                 validate_composer_json(working_dir, &args)?;
+            }
+
+            Commands::CreateProject(args) => {
+                create_project(&args, working_dir).await?;
+            }
+
+            Commands::DumpAutoload(_) => {
+                let composer_path = working_dir.join("composer.json");
+                let composer = read_composer_json(&composer_path)?;
+                let lock_path = working_dir.join("composer.lock");
+
+                if !lock_path.exists() {
+                    print_error("❌ No composer.lock found. Run 'lectern install' first.");
+                    return Ok(());
+                }
+
+                let lock = read_lock(&lock_path)?;
+                let installed: Vec<InstalledPackage> = lock
+                    .packages
+                    .iter()
+                    .map(|pkg| InstalledPackage {
+                        name: pkg.name.clone(),
+                        version: pkg.version.clone(),
+                        path: format!("vendor/{}", pkg.name).into(),
+                    })
+                    .collect();
+
+                write_autoload_files(working_dir, &composer, &installed).await?;
+                print_success("✅ Generated autoload files");
+            }
+
+            Commands::RunScript(args) => {
+                run_script(&args, working_dir).await?;
+            }
+
+            Commands::Diagnose => {
+                diagnose(working_dir).await?;
+            }
+
+            Commands::Archive(_args) => {
+                print_info("📦 Archive command not yet fully implemented");
+                // TODO: Implement archive functionality
+            }
+
+            Commands::ClearCache(args) => {
+                clear_cache(&args).await?;
+            }
+
+            Commands::Config(_args) => {
+                print_info("⚙️  Config command not yet fully implemented");
+                // TODO: Implement config management
+            }
+
+            Commands::Depends(args) => {
+                show_depends(&args, working_dir).await?;
+            }
+
+            Commands::Prohibits(args) => {
+                show_prohibits(&args, working_dir).await?;
+            }
+
+            Commands::Browse(args) => {
+                browse_package(&args).await?;
+            }
+
+            Commands::Suggests => {
+                show_suggests(working_dir).await?;
+            }
+
+            Commands::Fund => {
+                show_funding(working_dir).await?;
             }
         },
         _ => {

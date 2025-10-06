@@ -8,7 +8,6 @@ use crate::resolver::packagist::{
 use crate::resolver::version::parse_constraint;
 use crate::utils::{print_error, print_info, print_step, print_success, print_warning};
 use anyhow::{Result, anyhow};
-use reqwest::Client;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::Path;
 
@@ -16,7 +15,6 @@ use std::path::Path;
 pub async fn solve(composer: &ComposerJson) -> Result<crate::models::model::Lock> {
     print_step("🔍 Resolving dependencies...");
 
-    let client = Client::new();
     let mut locked_packages = Vec::new();
     let mut processed = BTreeSet::new();
     let mut queue = VecDeque::new();
@@ -53,7 +51,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::models::model::Lock
             "📥 Pre-fetching {} dependencies in batch...",
             all_deps.len()
         ));
-        let _bulk_versions = fetch_packagist_versions_bulk(&client, &all_deps)
+        let _bulk_versions = fetch_packagist_versions_bulk(&all_deps)
             .await
             .unwrap_or_default();
         print_success("✅ Batch pre-fetch completed");
@@ -105,7 +103,7 @@ pub async fn solve(composer: &ComposerJson) -> Result<crate::models::model::Lock
         }
 
         // Fetch available versions from Packagist
-        let versions = match fetch_packagist_versions_cached(&client, &pkg_name).await {
+        let versions = match fetch_packagist_versions_cached(&pkg_name).await {
             Ok(v) => v,
             Err(e) => {
                 print_warning(&format!("⚠️  Could not fetch versions for {pkg_name}: {e}"));

@@ -66,6 +66,30 @@ pub enum Commands {
     Licenses,
     /// Validate composer.json
     Validate(ValidateArgs),
+    /// Create a new project from a package
+    CreateProject(CreateProjectArgs),
+    /// Dump the autoload
+    DumpAutoload(DumpAutoloadArgs),
+    /// Run a script defined in composer.json
+    RunScript(RunScriptArgs),
+    /// Diagnose the system
+    Diagnose,
+    /// Create an archive of the project
+    Archive(ArchiveArgs),
+    /// Clear various caches
+    ClearCache(ClearCacheArgs),
+    /// Get and set configuration options
+    Config(ConfigArgs),
+    /// Show which packages depend on a given package
+    Depends(DependsArgs),
+    /// Show which packages prevent installing a given package
+    Prohibits(ProhibitsArgs),
+    /// Open package repository URL in browser
+    Browse(BrowseArgs),
+    /// Show suggested packages
+    Suggests,
+    /// Show funding information
+    Fund,
 }
 
 #[derive(Args, Debug)]
@@ -284,4 +308,153 @@ pub struct ValidateArgs {
     /// Strict validation
     #[arg(long = "strict")]
     pub strict: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct CreateProjectArgs {
+    /// Package name (vendor/package)
+    pub package: String,
+
+    /// Directory to install into
+    pub directory: Option<String>,
+
+    /// Version constraint
+    pub version: Option<String>,
+
+    /// Prefer source installs
+    #[arg(long = "prefer-source")]
+    pub prefer_source: bool,
+
+    /// Prefer dist installs
+    #[arg(long = "prefer-dist")]
+    pub prefer_dist: bool,
+
+    /// Repository to install from
+    #[arg(long = "repository")]
+    pub repository: Option<String>,
+
+    /// Install dev dependencies
+    #[arg(long = "dev")]
+    pub dev: bool,
+
+    /// Don't install dependencies
+    #[arg(long = "no-install")]
+    pub no_install: bool,
+
+    /// Ignore platform requirements
+    #[arg(long = "ignore-platform-reqs")]
+    pub ignore_platform_reqs: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct RunScriptArgs {
+    /// Script name to run
+    pub script: String,
+
+    /// Additional arguments to pass to the script
+    pub args: Vec<String>,
+
+    /// Run in dev mode
+    #[arg(long = "dev")]
+    pub dev: bool,
+
+    /// List available scripts
+    #[arg(long = "list")]
+    pub list: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct ArchiveArgs {
+    /// Package name to archive
+    pub package: Option<String>,
+
+    /// Version to archive
+    pub version: Option<String>,
+
+    /// Output file name
+    #[arg(long = "file")]
+    pub file: Option<String>,
+
+    /// Output directory
+    #[arg(long = "dir")]
+    pub dir: Option<String>,
+
+    /// Archive format (tar, zip)
+    #[arg(long = "format", default_value = "tar")]
+    pub format: String,
+}
+
+#[derive(Args, Debug)]
+pub struct ClearCacheArgs {
+    /// Clear specific cache type (repo, files, vcs, all)
+    pub cache_type: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct ConfigArgs {
+    /// Config key to get or set
+    pub key: Option<String>,
+
+    /// Value to set (if setting)
+    pub value: Option<String>,
+
+    /// List all config values
+    #[arg(long = "list")]
+    pub list: bool,
+
+    /// Get global config
+    #[arg(long = "global")]
+    pub global: bool,
+
+    /// Unset a config value
+    #[arg(long = "unset")]
+    pub unset: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct DependsArgs {
+    /// Package name to check
+    pub package: String,
+
+    /// Version constraint
+    pub constraint: Option<String>,
+
+    /// Check recursively
+    #[arg(long = "recursive")]
+    pub recursive: bool,
+
+    /// Show tree
+    #[arg(long = "tree")]
+    pub tree: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct ProhibitsArgs {
+    /// Package name to check
+    pub package: String,
+
+    /// Version constraint
+    pub constraint: Option<String>,
+
+    /// Check recursively
+    #[arg(long = "recursive")]
+    pub recursive: bool,
+
+    /// Show tree
+    #[arg(long = "tree")]
+    pub tree: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct BrowseArgs {
+    /// Package name to browse
+    pub package: String,
+
+    /// Open homepage instead of repository
+    #[arg(long = "homepage")]
+    pub homepage: bool,
+
+    /// Show URL instead of opening browser
+    #[arg(long = "show")]
+    pub show: bool,
 }

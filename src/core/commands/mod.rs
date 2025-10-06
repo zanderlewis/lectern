@@ -1,7 +1,31 @@
-pub mod info;
+// Command modules
+pub mod browse;
+pub mod clear_cache;
+pub mod depends;
+pub mod diagnose;
+pub mod funding;
+pub mod licenses;
+pub mod outdated;
+pub mod prohibits;
+pub mod project;
+pub mod script;
+pub mod search;
+pub mod show;
+pub mod status;
+pub mod suggests;
 
-// Re-export all command functions for convenience
-pub use info::{
-    check_outdated_packages, search_packages, show_dependency_licenses, show_dependency_status,
-    show_package_details,
-};
+// Re-export command functions
+pub use browse::browse_package;
+pub use clear_cache::clear_cache;
+pub use depends::show_depends;
+pub use diagnose::diagnose;
+pub use funding::show_funding;
+pub use licenses::show_dependency_licenses;
+pub use outdated::check_outdated_packages;
+pub use prohibits::show_prohibits;
+pub use project::create_project;
+pub use script::run_script;
+pub use search::search_packages;
+pub use show::show_package_details;
+pub use status::show_dependency_status;
+pub use suggests::show_suggests;

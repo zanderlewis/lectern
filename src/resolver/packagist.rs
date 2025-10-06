@@ -1,7 +1,7 @@
 use crate::cache;
+use crate::resolver::http_client::get_client;
 use anyhow::{Context, Result};
 use futures::stream::{FuturesUnordered, StreamExt};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -137,15 +137,14 @@ fn clean_unset_values(value: &mut serde_json::Value) {
 }
 
 /// Fetch packagist p2 JSON using client, with in-memory cache
-pub async fn fetch_packagist_versions_cached(client: &Client, pkg: &str) -> Result<Vec<P2Version>> {
+pub async fn fetch_packagist_versions_cached(pkg: &str) -> Result<Vec<P2Version>> {
     if let Some(cached) = cache::cache_get_meta(&format!("p2:{pkg}")).await {
         let list: Vec<P2Version> = serde_json::from_value(cached)?;
         return Ok(list);
     }
     let url = format!("https://repo.packagist.org/p2/{pkg}.json");
-    let resp = client
+    let resp = get_client()
         .get(&url)
-        .timeout(std::time::Duration::from_secs(30)) // Add timeout
         .send()
         .await
         .context("packagist request")?
@@ -172,7 +171,6 @@ pub async fn fetch_packagist_versions_cached(client: &Client, pkg: &str) -> Resu
 
 /// Fetch multiple packages concurrently for better performance
 pub async fn fetch_packagist_versions_bulk(
-    client: &Client,
     packages: &[String],
 ) -> Result<BTreeMap<String, Vec<P2Version>>> {
     let mut results = BTreeMap::new();
@@ -202,9 +200,8 @@ pub async fn fetch_packagist_versions_bulk(
     let mut futures = FuturesUnordered::new();
 
     for pkg in packages_to_fetch {
-        let client = client.clone();
         futures.push(async move {
-            match fetch_packagist_versions_cached(&client, &pkg).await {
+            match fetch_packagist_versions_cached(&pkg).await {
                 Ok(versions) => Some((pkg, versions)),
                 Err(_) => None,
             }
@@ -240,15 +237,13 @@ pub async fn search_packagist(terms: &[String]) -> Result<Vec<SearchResult>> {
         return Ok(serde_json::from_value(cached)?);
     }
 
-    let client = Client::new();
     let url = format!(
         "https://packagist.org/search.json?q={}&per_page=15",
         urlencoding::encode(&query)
     );
 
-    let resp = client
+    let resp = get_client()
         .get(&url)
-        .header("User-Agent", "Lectern/0.1.0")
         .send()
         .await
         .context("packagist search request")?
@@ -275,13 +270,10 @@ pub async fn fetch_package_info(package_name: &str) -> Result<PackageInfo> {
         return Ok(serde_json::from_value(cached)?);
     }
 
-    let client = Client::new();
     let url = format!("https://packagist.org/packages/{package_name}.json");
 
-    let resp = client
+    let resp = get_client()
         .get(&url)
-        .header("User-Agent", "Lectern/0.1.0")
-        .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
         .context("packagist package info request")?

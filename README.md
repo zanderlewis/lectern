@@ -1,5 +1,12 @@
 # Lectern
-Lectern is an async and concurrent rewrite of PHP's Composer package manager in Rust. Built with lots of help from ChatGPT-5 and Claude Sonnet 4.
+Lectern is an async and concurrent rewrite of PHP's Composer package manager in Rust. Built with lots of help from ChatGPT-5 and Claude Sonnet 4[.5].
+
+## Recent Improvements
+- ⚡ **Optimized outdated command** with better caching and increased concurrency (50x parallelism)
+- 🚀 **HTTP connection pooling** with persistent connections and HTTP/2 multiplexing
+- 📦 **New commands added**: create-project, dump-autoload, run-script, diagnose, clear-cache, depends, prohibits, browse, suggests, fund
+- 🔧 **Modular codebase** with better organized command structure
+- 💾 **Improved caching** with multi-layered in-memory and disk caching
 
 ## Todo
 Lectern is not a complete replacement for Composer just yet!
@@ -7,8 +14,8 @@ Some things I haven't been able to test (as AI wrote that code),
 or aren't of high priority.
 - Composer compatible plugin system
 - Testing of private packages and git repositories
-- Implement the rest of Composer's commands
-- Speed up Outdated checks, as they are slower than Composer currently
+- Implement remaining Composer commands (config, global, archive)
+- Further optimize dependency resolver with constraint caching
 
 ## Benchmarks
 This image is the performance comparison for Lectern and Composer cache hits on various different commands (lower is better):
@@ -66,3 +73,33 @@ Displays the licenses of installed dependencies.
 
 ### `lectern validate`
 Validates the `composer.json` file for correctness.
+
+### `lectern create-project <package> [directory]`
+Creates a new project from a package (similar to `composer create-project`).
+
+### `lectern dump-autoload`
+Regenerates the autoloader files.
+
+### `lectern run-script <script>`
+Runs a script defined in `composer.json`.
+
+### `lectern diagnose`
+Diagnoses the system to identify common problems.
+
+### `lectern clear-cache [type]`
+Clears Lectern's cache (types: all, repo, files).
+
+### `lectern depends <package>`
+Shows which packages depend on a given package (similar to `composer why`).
+
+### `lectern prohibits <package>`
+Shows which packages prevent installing a given package (similar to `composer why-not`).
+
+### `lectern browse <package>`
+Opens the package repository URL in your browser.
+
+### `lectern suggests`
+Shows all suggested packages from installed dependencies.
+
+### `lectern fund`
+Shows funding information for installed packages.

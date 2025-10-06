@@ -9,7 +9,7 @@ use tokio::task;
 
 use crate::core::installer::installer_utils as inst_utils;
 
-const DOWNLOAD_CHUNK_SIZE: usize = 65536;
+const DOWNLOAD_CHUNK_SIZE: usize = 65536; // 64 KB
 const STREAMING_THRESHOLD: usize = 1024 * 1024; // 1 MB
 
 pub fn get_cached_package_path(name: &str, version: &str, url: &str) -> std::path::PathBuf {
@@ -40,24 +40,43 @@ pub async fn download_and_extract_streaming(
             .unwrap_or(false);
 
     if !cache_exists {
-        let _net_guard = net_sem.acquire_owned().await?;
+        // Use a lock file to prevent concurrent downloads
+        let lock_path = cache_path.with_extension("lock");
+        
+        // Try to create lock file atomically
+        let lock_created = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+            .await;
+        
+        match lock_created {
+            Ok(_lock_file) => {
+                // We got the lock, proceed with download
+                let _net_guard = net_sem.acquire_owned().await?;
 
-        // Ultra-optimized download with connection reuse and compression
-        let response = client
-            .get(url)
-            .header("Accept-Encoding", "gzip, deflate, br, zstd")
-            .header("Accept", "*/*")
-            .header("Connection", "keep-alive")
-            .send()
-            .await?
-            .error_for_status()?;
+                // Double-check if file was created while we were waiting
+                if cache_path.exists() {
+                    let _ = fs::remove_file(&lock_path).await;
+                    return Ok(());
+                }
 
-        let total_size = response.content_length();
+                // Ultra-optimized download with connection reuse and compression
+                let response = client
+                    .get(url)
+                    .header("Accept-Encoding", "gzip, deflate, br, zstd")
+                    .header("Accept", "*/*")
+                    .header("Connection", "keep-alive")
+                    .send()
+                    .await?
+                    .error_for_status()?;
 
-        // Stream directly to cache with larger buffer for better throughput
-        let temp_path = cache_path.with_extension("tmp");
-        let mut cache_file = fs::File::create(&temp_path).await?;
-        let mut buffer = Vec::with_capacity(DOWNLOAD_CHUNK_SIZE);
+                let total_size = response.content_length();
+
+                // Stream directly to cache with larger buffer for better throughput
+                let temp_path = cache_path.with_extension("tmp");
+                let mut cache_file = fs::File::create(&temp_path).await?;
+                let mut buffer = Vec::with_capacity(DOWNLOAD_CHUNK_SIZE);
 
         let mut stream = response.bytes_stream();
         let mut downloaded = 0u64;
@@ -96,6 +115,24 @@ pub async fn download_and_extract_streaming(
 
         // Atomic rename
         fs::rename(&temp_path, &cache_path).await?;
+        
+        // Remove lock file
+        let _ = fs::remove_file(&lock_path).await;
+            }
+            Err(_) => {
+                // Another thread is downloading, wait for it to finish
+                for _ in 0..100 {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                    if cache_path.exists() {
+                        break;
+                    }
+                }
+                // If still not exists after waiting, return error
+                if !cache_path.exists() {
+                    return Err(anyhow::anyhow!("Failed to download package: timeout waiting for concurrent download"));
+                }
+            }
+        }
     }
 
     // Parallel extraction with semaphore limiting

@@ -52,7 +52,14 @@ pub fn extract_zip_ultra_fast(archive: &Path, dest: &Path) -> Result<()> {
     // Single pass to categorize entries
     for i in 0..file_count {
         let entry = zip.by_index(i)?;
-        let path = dest.join(crate::utils::strip_first_component(entry.name()));
+        let stripped = crate::core::utils::strip_first_component(entry.name());
+        
+        // Skip if path becomes empty after stripping (root-level files with single component)
+        if stripped.as_os_str().is_empty() {
+            continue;
+        }
+        
+        let path = dest.join(stripped);
 
         if entry.is_dir() {
             directories.push(path);
@@ -102,8 +109,37 @@ pub fn extract_tar_gz_ultra_fast(archive: &Path, dest: &Path) -> Result<()> {
     tar.set_preserve_permissions(false);
     tar.set_preserve_mtime(false);
 
-    // Extract all with optimized settings
-    tar.unpack(dest)?;
+    // Extract entries manually to strip first component
+    for entry_result in tar.entries()? {
+        let mut entry = entry_result?;
+        let entry_path = entry.path()?;
+        
+        // Strip the first component from the path
+        let stripped = crate::core::utils::strip_first_component(
+            entry_path.to_str().unwrap_or("")
+        );
+        
+        // Skip if path becomes empty after stripping
+        if stripped.as_os_str().is_empty() {
+            continue;
+        }
+        
+        let target_path = dest.join(stripped);
+        
+        // Handle directories
+        if entry.header().entry_type().is_dir() {
+            std::fs::create_dir_all(&target_path).ok(); // Ignore errors if already exists
+            continue;
+        }
+        
+        // Create parent directories if needed for files
+        if let Some(parent) = target_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        
+        // Extract the file
+        entry.unpack(&target_path)?;
+    }
 
     Ok(())
 }
