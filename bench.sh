@@ -186,89 +186,172 @@ rm -rf "$BENCH_DIR"
 echo ""
 echo "📊 Generating report..."
 
-# Function to extract times and calculate speedup
-process_benchmark() {
+# Function to extract mean time from hyperfine markdown output
+get_mean_time() {
     local file=$1
-    local name=$2
-    local lectern_time=$(grep "lectern" "$file" | awk '{print $3}')
-    local composer_time=$(grep "composer" "$file" | awk '{print $3}')
-    
-    # Calculate speedup using bc if available, otherwise use awk
-    if command -v bc &> /dev/null; then
-        local speedup=$(echo "scale=2; $composer_time / $lectern_time" | bc)
-    else
-        local speedup=$(awk "BEGIN {printf \"%.2f\", $composer_time / $lectern_time}")
-    fi
-    
-    echo "| $name | ${lectern_time} | ${composer_time} | ${speedup}x |" >> "$REPORT_FILE"
+    local command=$2
+    # Extract the mean time from the markdown table (column 2, which is the "Mean" column)
+    # The format is: | `command name` | mean ± std | min | max | relative |
+    grep "\`$command" "$file" | awk -F'|' '{print $3}' | awk '{print $1}'
 }
 
-process_benchmark "/tmp/bench_install.md" "install"
-process_benchmark "/tmp/bench_update.md" "update"
-process_benchmark "/tmp/bench_search.md" "search"
-process_benchmark "/tmp/bench_show.md" "show"
-process_benchmark "/tmp/bench_outdated.md" "outdated"
-process_benchmark "/tmp/bench_licenses.md" "licenses"
-process_benchmark "/tmp/bench_status.md" "status"
-process_benchmark "/tmp/bench_require.md" "require"
-process_benchmark "/tmp/bench_remove.md" "remove"
+# Function to calculate speedup
+calc_speedup() {
+    local lectern=$1
+    local composer=$2
+    if command -v bc &> /dev/null; then
+        echo "scale=1; $composer / $lectern" | bc
+    else
+        awk "BEGIN {printf \"%.1f\", $composer / $lectern}"
+    fi
+}
 
-# Add detailed results section
+# Create report header
+cat > "$REPORT_FILE" << EOF
+# Lectern vs Composer Performance Benchmark
+
+> Generated on: $(date '+%Y-%m-%d %H:%M:%S')
+
+This benchmark compares the performance of Lectern against Composer across various common operations.
+
+## System Information
+
+- **Benchmark Tool**: hyperfine with 2 warmup runs and 5 test runs (3 for require/remove)
+- **Test Setup**: Warm cache conditions for both tools
+
+## Results Summary
+
+| Command | Lectern (ms) | Composer (ms) | Speedup |
+|---------|--------------|---------------|---------|
+EOF
+
+# Process each benchmark and add to summary table
+for bench in install update search show outdated licenses status require remove; do
+    local_file="/tmp/bench_${bench}.md"
+    if [ -f "$local_file" ]; then
+        lectern_time=$(get_mean_time "$local_file" "lectern")
+        composer_time=$(get_mean_time "$local_file" "composer")
+        
+        if [ -n "$lectern_time" ] && [ -n "$composer_time" ]; then
+            # Remove any non-numeric characters except dots
+            lectern_clean=$(echo "$lectern_time" | tr -cd '0-9.')
+            composer_clean=$(echo "$composer_time" | tr -cd '0-9.')
+            
+            if [ -n "$lectern_clean" ] && [ -n "$composer_clean" ]; then
+                speedup=$(calc_speedup "$lectern_clean" "$composer_clean")
+                echo "| $bench | $lectern_clean | $composer_clean | ${speedup}x |" >> "$REPORT_FILE"
+            fi
+        fi
+    fi
+done
+
+# Add detailed results section with full hyperfine tables
 cat >> "$REPORT_FILE" << 'EOF'
 
 ## Detailed Results
 
+Each benchmark includes mean execution time ± standard deviation, with min and max values.
+
 ### Install Command
+
+Fresh installation of all dependencies.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_install.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_install.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Update Command
+
+Update all dependencies to their latest allowed versions.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_update.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_update.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Search Command
+
+Search for packages on Packagist.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_search.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_search.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Show Command
+
+Display detailed information about a specific package.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_show.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_show.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Outdated Command
+
+Check for outdated packages.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_outdated.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_outdated.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Licenses Command
+
+Display licenses of installed packages.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_licenses.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_licenses.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Status Command
+
+Show status of installed packages.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_status.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_status.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Require Command
+
+Add a new package to the project.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_require.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_require.md >> "$REPORT_FILE"
 
 cat >> "$REPORT_FILE" << 'EOF'
 
 ### Remove Command
+
+Remove a package from the project.
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
 EOF
-tail -n +3 /tmp/bench_remove.md >> "$REPORT_FILE"
+tail -n +2 /tmp/bench_remove.md >> "$REPORT_FILE"
+
+cat >> "$REPORT_FILE" << 'EOF'
+
+---
+
+## Notes
+
+- All benchmarks are run with warm caches to measure steady-state performance
+- Times shown are in milliseconds (ms)
+- Speedup is calculated as: Composer time / Lectern time
+- Each command is run multiple times (2 warmup + 5 test runs, or 1 warmup + 3 test runs for require/remove)
+
+EOF
 
 # Cleanup temp files
 rm -f /tmp/bench_*.md
