@@ -7,7 +7,6 @@ test*/
 
 # Benchmarks
 bench-test/
-BENCHMARK.md
 
 # OS specific
 .DS_Store
