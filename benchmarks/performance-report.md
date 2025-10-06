@@ -1,6 +1,6 @@
 # Lectern vs Composer Comprehensive Benchmark Report
 
-Generated: 2025-10-06 11:32:33
+Generated: 2025-10-06 13:11:47
 
 ## Summary
 
@@ -11,8 +11,8 @@ Please note that performance is tested when both Composer and Lectern have warm 
 ### Overall Performance
 - **Tests Completed**: 13
 - **Successful Comparisons**: 13
-- **Average Performance Improvement**: 15.6x faster
-- **Best Performance**: 33.4x faster
+- **Average Performance Improvement**: 15.3x faster
+- **Best Performance**: 30.7x faster
 - **Architecture**: Rust with concurrent operations, multi-layered caching
 
 ## Detailed Results
@@ -52,43 +52,43 @@ Performance breakdown by command category, comparing average improvements and ex
 
 | Command | Lectern Time | Composer Time | Performance | Status |
 |---------|--------------|---------------|-------------|--------|
-| Install Dependencies | 0.035s | 0.493s | 14.1x | 🚀 14.1x faster |
-| Update Dependencies | 0.058s | 1.207s | 20.8x | 🚀 20.8x faster |
-| Search Packages | 0.188s | 0.337s | 1.8x | 🚀 1.8x faster |
-| Show Package Info | 0.045s | 0.618s | 13.8x | 🚀 13.8x faster |
-| Check Outdated | 0.236s | 0.144s | 0.6x | ⚡ 1.6x slower |
-| Show Licenses | 0.007s | 0.107s | 15.5x | 🚀 15.5x faster |
-| Show Status | 0.005s | 0.100s | 20.8x | 🚀 20.8x faster |
-| Require Package | 0.040s | 1.345s | 33.4x | 🚀 33.4x faster |
-| Remove Package | 0.061s | 0.573s | 9.4x | 🚀 9.4x faster |
-| Status Check (simple-laravel) | 0.007s | 0.152s | 21.1x | 🚀 21.1x faster |
-| Outdated Check (simple-laravel) | 0.209s | 0.157s | 0.8x | ⚡ 1.3x slower |
-| Status Check (symfony-app) | 0.006s | 0.143s | 24.0x | 🚀 24.0x faster |
-| Outdated Check (symfony-app) | 0.006s | 0.152s | 26.9x | 🚀 26.9x faster |
+| Install Dependencies | 0.037s | 0.494s | 13.5x | 🚀 13.5x faster |
+| Update Dependencies | 0.042s | 1.022s | 24.2x | 🚀 24.2x faster |
+| Search Packages | 0.181s | 0.458s | 2.5x | 🚀 2.5x faster |
+| Show Package Info | 0.044s | 0.552s | 12.5x | 🚀 12.5x faster |
+| Check Outdated | 0.104s | 0.116s | 1.1x | 🚀 1.1x faster |
+| Show Licenses | 0.006s | 0.102s | 16.5x | 🚀 16.5x faster |
+| Show Status | 0.008s | 0.101s | 12.7x | 🚀 12.7x faster |
+| Require Package | 0.045s | 1.382s | 30.7x | 🚀 30.7x faster |
+| Remove Package | 0.053s | 0.610s | 11.5x | 🚀 11.5x faster |
+| Status Check (simple-laravel) | 0.006s | 0.142s | 22.0x | 🚀 22.0x faster |
+| Outdated Check (simple-laravel) | 0.101s | 0.148s | 1.5x | 🚀 1.5x faster |
+| Status Check (symfony-app) | 0.005s | 0.133s | 27.3x | 🚀 27.3x faster |
+| Outdated Check (symfony-app) | 0.006s | 0.140s | 23.0x | 🚀 23.0x faster |
 
 ### Performance Categories
 
 #### ⚡ Ultra-Fast Commands (10x+ improvement)
-9 commands with exceptional performance gains:
-- **Install Dependencies**: 14.1x faster (0.493s → 0.035s)
-- **Update Dependencies**: 20.8x faster (1.207s → 0.058s)
-- **Show Package Info**: 13.8x faster (0.618s → 0.045s)
-- **Show Licenses**: 15.5x faster (0.107s → 0.007s)
-- **Show Status**: 20.8x faster (0.100s → 0.005s)
-- **Require Package**: 33.4x faster (1.345s → 0.040s)
-- **Status Check (simple-laravel)**: 21.1x faster (0.152s → 0.007s)
-- **Status Check (symfony-app)**: 24.0x faster (0.143s → 0.006s)
-- **Outdated Check (symfony-app)**: 26.9x faster (0.152s → 0.006s)
+10 commands with exceptional performance gains:
+- **Install Dependencies**: 13.5x faster (0.494s → 0.037s)
+- **Update Dependencies**: 24.2x faster (1.022s → 0.042s)
+- **Show Package Info**: 12.5x faster (0.552s → 0.044s)
+- **Show Licenses**: 16.5x faster (0.102s → 0.006s)
+- **Show Status**: 12.7x faster (0.101s → 0.008s)
+- **Require Package**: 30.7x faster (1.382s → 0.045s)
+- **Remove Package**: 11.5x faster (0.610s → 0.053s)
+- **Status Check (simple-laravel)**: 22.0x faster (0.142s → 0.006s)
+- **Status Check (symfony-app)**: 27.3x faster (0.133s → 0.005s)
+- **Outdated Check (symfony-app)**: 23.0x faster (0.140s → 0.006s)
 
 #### 🚀 Fast Commands (2-10x improvement)
 1 commands with significant performance gains:
-- **Remove Package**: 9.4x faster (0.573s → 0.061s)
+- **Search Packages**: 2.5x faster (0.458s → 0.181s)
 
 #### 🟰 Similar Performance (0.5-2x)
-3 commands with comparable performance:
-- **Search Packages**: 1.8x (0.337s vs 0.188s)
-- **Check Outdated**: 0.6x (0.144s vs 0.236s)
-- **Outdated Check (simple-laravel)**: 0.8x (0.157s vs 0.209s)
+2 commands with comparable performance:
+- **Check Outdated**: 1.1x (0.116s vs 0.104s)
+- **Outdated Check (simple-laravel)**: 1.5x (0.148s vs 0.101s)
 
 ## Technical Architecture
 
@@ -117,31 +117,31 @@ Performance breakdown by command category, comparing average improvements and ex
 
 ### Core Commands
 #### Install Dependencies
-- **Performance**: 14.1x faster
-- **Lectern**: 0.035s
-- **Composer**: 0.493s
-- **Status**: 🚀 14.1x faster
+- **Performance**: 13.5x faster
+- **Lectern**: 0.037s
+- **Composer**: 0.494s
+- **Status**: 🚀 13.5x faster
 - **Notes**: Real installation with backup/restore
 
 #### Update Dependencies
-- **Performance**: 20.8x faster
-- **Lectern**: 0.058s
-- **Composer**: 1.207s
-- **Status**: 🚀 20.8x faster
+- **Performance**: 24.2x faster
+- **Lectern**: 0.042s
+- **Composer**: 1.022s
+- **Status**: 🚀 24.2x faster
 - **Notes**: Real update with backup/restore
 
 #### Search Packages
-- **Performance**: 1.8x faster
-- **Lectern**: 0.188s
-- **Composer**: 0.337s
-- **Status**: 🚀 1.8x faster
+- **Performance**: 2.5x faster
+- **Lectern**: 0.181s
+- **Composer**: 0.458s
+- **Status**: 🚀 2.5x faster
 - **Notes**: Standard operation
 
 #### Show Package Info
-- **Performance**: 13.8x faster
-- **Lectern**: 0.045s
-- **Composer**: 0.618s
-- **Status**: 🚀 13.8x faster
+- **Performance**: 12.5x faster
+- **Lectern**: 0.044s
+- **Composer**: 0.552s
+- **Status**: 🚀 12.5x faster
 - **Notes**: Standard operation
 
 
@@ -159,7 +159,7 @@ Performance breakdown by command category, comparing average improvements and ex
 Lectern demonstrates significant performance improvements over Composer while maintaining full compatibility. The combination of Rust's performance, concurrent operations, and intelligent caching provides substantial speed gains for PHP package management.
 
 ### Key Achievements
-- **Average 15.6x performance improvement**
+- **Average 15.3x performance improvement**
 - **Full command compatibility** with Composer
 - **Intelligent caching** with persistence
 - **Concurrent operations** for parallel processing
